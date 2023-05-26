@@ -3,8 +3,17 @@ use super::*;
 pub const BOOK_DEPTH: usize = 128;
 pub const NUM_MARKET_MAKERS: usize = 64;
 
+#[account]
+pub struct GlobalState {
+    /// The CLOB needs fees to disincentivize wash trading / TWAP manipulation.
+    /// Besides, profits are virtuous :)
+    pub fee_admin: Pubkey,
+    pub fee_in_bps: u8,
+}
+
 #[account(zero_copy)]
 pub struct OrderBook {
+    pub global_state: Pubkey,
     pub buys: [Order; BOOK_DEPTH],
     pub sells: [Order; BOOK_DEPTH],
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
