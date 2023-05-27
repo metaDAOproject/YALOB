@@ -22,7 +22,8 @@ pub mod clob {
     }
 
     pub fn initialize_order_book(ctx: Context<InitializeOrderBook>) -> Result<()> {
-        let mut order_book = ctx.accounts.order_book.load_init()?;
+        ctx.accounts.order_book.load_init()?;
+
         Ok(())
     }
 }

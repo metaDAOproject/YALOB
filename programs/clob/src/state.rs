@@ -13,7 +13,6 @@ pub struct GlobalState {
 
 #[account(zero_copy)]
 pub struct OrderBook {
-    pub global_state: Pubkey,
     pub buys: [Order; BOOK_DEPTH],
     pub sells: [Order; BOOK_DEPTH],
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
