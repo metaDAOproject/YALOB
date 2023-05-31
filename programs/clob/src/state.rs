@@ -7,19 +7,25 @@ pub const NUM_MARKET_MAKERS: usize = 64;
 pub struct GlobalState {
     /// The CLOB needs fees to disincentivize wash trading / TWAP manipulation.
     /// Besides, profits are virtuous :)
-    pub fee_admin: Pubkey,
+    pub fee_collector: Pubkey,
     pub fee_in_bps: u8,
+    /// Since market maker slots are finite, we need some cost to prevent someone
+    /// from taking all the market maker slots. Also, have I mentioned that profits
+    /// are virtuous?
+    pub market_maker_burn_in_lamports: u64,
 }
 
 #[account(zero_copy)]
 pub struct OrderBook {
+    pub base_vault: Pubkey,
+    pub quote_vault: Pubkey,
     pub buys: [Order; BOOK_DEPTH],
     pub sells: [Order; BOOK_DEPTH],
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
 }
 
 /// To maximize cache hits and to minimize `OrderBook` size, this struct is
-/// as small as possible. Many of its fields are 'implied' rather than encoded.
+/// as small as possible. Many of its fields are implied rather than encoded.
 /// Specifically,
 /// * Whether it's a buy or sell is determined by whether it sits within `buys`
 ///   or `sells`.
@@ -38,7 +44,7 @@ pub struct Order {
 #[zero_copy]
 pub struct MarketMaker {
     // 48 bytes
-    pub base_amount_owed: u64,
-    pub quote_amount_owed: u64,
+    pub base_balance: u64,
+    pub quote_balance: u64,
     pub authority: Pubkey,
 }
