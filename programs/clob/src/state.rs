@@ -1,7 +1,16 @@
 use super::*;
 
+use sokoban::RedBlackTree;
+
 pub const BOOK_DEPTH: usize = 128;
 pub const NUM_MARKET_MAKERS: usize = 64;
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+#[zero_copy]
+pub struct OrderTree {
+    pub inner: RedBlackTree<u64, Order, BOOK_DEPTH>
+}
+
 
 #[account]
 pub struct GlobalState {
@@ -19,8 +28,8 @@ pub struct GlobalState {
 pub struct OrderBook {
     pub base_vault: Pubkey,
     pub quote_vault: Pubkey,
-    pub buys: [Order; BOOK_DEPTH],
-    pub sells: [Order; BOOK_DEPTH],
+    pub buys: OrderTree,
+    pub sells: OrderTree,
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
 }
 
@@ -32,13 +41,13 @@ pub struct OrderBook {
 /// * The amount of tokens that the market maker would receive if the order is
 ///   filled = (amount * price) / 1e9.
 #[zero_copy]
+#[derive(Default, AnchorSerialize, AnchorDeserialize)]
 pub struct Order {
     // 24 bytes
     pub id: u32,
     pub _padding: [u8; 3],
     pub market_maker_index: u8,
     pub amount: u64,
-    pub price: u64,
 }
 
 #[zero_copy]

@@ -122,5 +122,13 @@ describe("CLOB", () => {
       })
       .signers([marketMaker])
       .rpc();
+
+    await program.methods.submitLimitBuy(new anchor.BN(100), new anchor.BN(1e9), 0)
+      .accounts({
+        authority: marketMaker.publicKey,
+        orderBook,
+      })
+      .signers([marketMaker])
+      .rpc();
   });
 });

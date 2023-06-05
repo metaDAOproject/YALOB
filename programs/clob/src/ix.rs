@@ -80,3 +80,10 @@ pub struct TopUpBalance<'info> {
     pub quote_vault: Account<'info, TokenAccount>,
     pub token_progam: Program<'info, Token>,
 }
+
+#[derive(Accounts)]
+pub struct SubmitLimitBuy<'info> {
+    #[account(mut)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+    pub authority: Signer<'info>,
+}

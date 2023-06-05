@@ -19,3 +19,4 @@ default = []
 anchor-lang = { git = "https://github.com/coral-xyz/anchor" }
 anchor-spl = { git = "https://github.com/coral-xyz/anchor" }
 bytemuck = { version = "^1.7.2", features = ["derive", "min_const_generics"] }
+lib-sokoban = { git = "https://github.com/metaproph3t/sokoban.git", branch = "add-borsh-3" }

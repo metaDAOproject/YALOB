@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
 use bytemuck::Zeroable;
+use sokoban::NodeAllocatorMap;
+// use borsh::{BorshDeserialize, BorshSerialize};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -110,6 +112,42 @@ pub mod clob {
 
         market_maker.base_balance += base_amount;
         market_maker.quote_balance += quote_amount;
+
+        Ok(())
+    }
+
+    pub fn submit_limit_buy(
+        ctx: Context<SubmitLimitBuy>,
+        amount_in: u64,
+        price: u64,
+        market_maker_index: u32,
+    ) -> Result<()> {
+        // TODO: add cluster restart logic, preventing take orders within x
+        // slots of restart
+
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+
+        require!(
+            market_maker.authority == ctx.accounts.authority.key(),
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        market_maker
+            .quote_balance
+            .checked_sub(amount_in)
+            .ok_or(CLOBError::InsufficientBalance)?;
+
+        order_book.buys.inner.insert(
+            price,
+            Order {
+                id: 0,
+                _padding: Default::default(),
+                market_maker_index: market_maker_index as u8,
+                amount: amount_in,
+            },
+        );
 
         Ok(())
     }
