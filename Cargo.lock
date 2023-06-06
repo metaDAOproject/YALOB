@@ -471,7 +471,6 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
- "lib-sokoban",
 ]
 
 [[package]]
@@ -893,18 +892,6 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "lib-sokoban"
-version = "0.3.1"
-source = "git+https://github.com/metaproph3t/sokoban.git?branch=add-borsh-3#5dee6b2f06e75fdfef216e27c8d92897e9f4606e"
-dependencies = [
- "borsh",
- "bytemuck",
- "num-derive",
- "num-traits",
- "thiserror",
-]
 
 [[package]]
 name = "libc"
