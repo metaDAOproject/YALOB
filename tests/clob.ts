@@ -131,18 +131,18 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    // for (let i = 0; i < 200; i++) {
-    //   await program.methods.submitLimitBuy(new anchor.BN(101), new anchor.BN(1e9+1), 0)
-    //     .accounts({
-    //       authority: marketMaker.publicKey,
-    //       orderBook,
-    //     })
-    //     .signers([marketMaker])
-    //     .rpc();
+    for (let i = 0; i < 200; i++) {
+      await program.methods.submitLimitBuy(new anchor.BN(101), new anchor.BN(1e9+1), 0)
+        .accounts({
+          authority: marketMaker.publicKey,
+          orderBook,
+        })
+        .signers([marketMaker])
+        .rpc();
 
-    // }
+    }
 
-    // console.log((await program.account.orderBook.fetch(orderBook)).buys);
+    console.log((await program.account.orderBook.fetch(orderBook)).buys);
 
   });
 });

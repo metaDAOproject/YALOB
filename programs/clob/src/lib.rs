@@ -38,13 +38,13 @@ pub mod clob {
 
         order_book.buys.side = Side::Buy.into();
         order_book.buys.free_bitmap = FreeBitmap::default();
-        order_book.buys.best_order_index = NULL;
-        order_book.buys.worst_order_index = NULL;
+        order_book.buys.best_order_idx = NULL;
+        order_book.buys.worst_order_idx = NULL;
 
         order_book.sells.side = Side::Sell.into();
         order_book.sells.free_bitmap = FreeBitmap::default();
-        order_book.sells.best_order_index = NULL;
-        order_book.sells.worst_order_index = NULL;
+        order_book.sells.best_order_idx = NULL;
+        order_book.sells.worst_order_idx = NULL;
 
         Ok(())
     }
@@ -152,8 +152,8 @@ pub mod clob {
             _padding: Default::default(),
             market_maker_index: market_maker_index as u8,
             amount: amount_in,
-            prev_index: NULL,
-            next_index: NULL,
+            prev_idx: NULL,
+            next_idx: NULL,
         });
 
         Ok(())
