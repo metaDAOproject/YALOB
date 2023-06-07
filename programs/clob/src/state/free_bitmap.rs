@@ -2,8 +2,7 @@ use super::*;
 
 use std::default::Default;
 
-#[derive(Pod, Zeroable, Clone, Copy)]
-#[repr(C)]
+#[zero_copy]
 pub struct FreeBitmap {
     inner: u128,
 }
@@ -17,7 +16,7 @@ impl Default for FreeBitmap {
 impl FreeBitmap {
     pub fn get_first_free_chunk(&self) -> Option<usize> {
         if self.inner > 0 {
-            Some(self.inner.leading_zeros() as usize)
+            Some(self.inner.trailing_zeros() as usize)
         } else {
             None
         }
@@ -44,5 +43,4 @@ impl FreeBitmap {
             self.inner &= !mask;
         }
     }
-
 }

@@ -36,6 +36,16 @@ pub mod clob {
         order_book.base_vault = ctx.accounts.base_vault.key();
         order_book.quote_vault = ctx.accounts.quote_vault.key();
 
+        order_book.buys.side = Side::Buy.into();
+        order_book.buys.free_bitmap = FreeBitmap::default();
+        order_book.buys.best_order_index = NULL;
+        order_book.buys.worst_order_index = NULL;
+
+        order_book.sells.side = Side::Sell.into();
+        order_book.sells.free_bitmap = FreeBitmap::default();
+        order_book.sells.best_order_index = NULL;
+        order_book.sells.worst_order_index = NULL;
+
         Ok(())
     }
 
@@ -114,39 +124,38 @@ pub mod clob {
         Ok(())
     }
 
-    // pub fn submit_limit_buy(
-    //     ctx: Context<SubmitLimitBuy>,
-    //     amount_in: u64,
-    //     price: u64,
-    //     market_maker_index: u32,
-    // ) -> Result<()> {
-    //     // TODO: add cluster restart logic, preventing take orders within x
-    //     // slots of restart
+    pub fn submit_limit_buy(
+        ctx: Context<SubmitLimitBuy>,
+        amount_in: u64,
+        price: u64,
+        market_maker_index: u32,
+    ) -> Result<()> {
+        // TODO: add cluster restart logic, preventing take orders within x
+        // slots of restart
 
-    //     let mut order_book = ctx.accounts.order_book.load_mut()?;
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
 
-    //     let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
 
-    //     require!(
-    //         market_maker.authority == ctx.accounts.authority.key(),
-    //         CLOBError::UnauthorizedMarketMaker
-    //     );
+        require!(
+            market_maker.authority == ctx.accounts.authority.key(),
+            CLOBError::UnauthorizedMarketMaker
+        );
 
-    //     market_maker
-    //         .quote_balance
-    //         .checked_sub(amount_in)
-    //         .ok_or(CLOBError::InsufficientBalance)?;
+        market_maker
+            .quote_balance
+            .checked_sub(amount_in)
+            .ok_or(CLOBError::InsufficientBalance)?;
 
-    //     order_book.buys.inner.insert(
-    //         price,
-    //         Order {
-    //             id: 0,
-    //             _padding: Default::default(),
-    //             market_maker_index: market_maker_index as u8,
-    //             amount: amount_in,
-    //         },
-    //     );
+        order_book.buys.insert_order(Order {
+            price,
+            _padding: Default::default(),
+            market_maker_index: market_maker_index as u8,
+            amount: amount_in,
+            prev_index: NULL,
+            next_index: NULL,
+        });
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }

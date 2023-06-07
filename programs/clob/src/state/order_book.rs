@@ -86,7 +86,10 @@ impl OrderList {
 
                 order.next_index = i;
 
+                msg!("free chunk: {}", free_chunk);
+
                 self.orders[free_chunk] = order;
+                self.free_bitmap.mark_reserved(free_chunk as u8);
 
                 return Some(free_chunk as u8);
             }
@@ -95,19 +98,22 @@ impl OrderList {
         }
 
         // the order isn't better than any on the book. If there's a free
-        // chunk, place it there. 
+        // chunk, place it there.
         self.free_bitmap.get_first_free_chunk().map(|free_chunk| {
             order.prev_index = match prev_order {
                 Some((mut prev_order, i)) => {
                     prev_order.next_index = free_chunk as u8;
                     self.orders[i as usize] = prev_order;
                     i
-                },
+                }
                 // a `None` condition only arises when the order is simultaneously
                 // better than no orders on the book and better than all orders on
                 // the book, which can only happen when there are no orders on the
                 // book
-                None => NULL,
+                None => {
+                    self.best_order_index = free_chunk as u8;
+                    NULL
+                },
             };
             order.next_index = NULL;
 
@@ -115,7 +121,7 @@ impl OrderList {
             self.free_bitmap.mark_reserved(free_chunk as u8);
             self.worst_order_index = free_chunk as u8;
 
-            free_chunk.try_into().unwrap()
+            free_chunk as u8
         })
     }
 
@@ -123,9 +129,7 @@ impl OrderList {
         // TODO credit the mm back the tokens
         let order_to_delete = self.orders[i as usize];
 
-        if order_to_delete.prev_index != NULL {
-
-        }
+        if order_to_delete.prev_index != NULL {}
 
         self.orders[i as usize] = Order::default();
     }
@@ -138,66 +142,6 @@ impl OrderList {
         }
     }
 }
-
-// impl OrderList {
-//     fn insert_order(&mut self, order: Order) -> Option<u8> {
-//         let mut i = self.best_order_index as usize;
-
-//         // find the first order in the list that this order beats on price
-//         let first_worse_order = self.get_first_worse_order(order);
-
-//         match first_worse_order {
-//             None => {
-//                 if self.size as usize == BOOK_DEPTH {
-//                     None
-//                 } else {
-//                     let bump_index = self.bump_index;
-//                     if (bump_index as usize) < BOOK_DEPTH {
-//                         order.prev_index = self.worst_order_index;
-//                         self.worst_order_index = bump_index;
-//                         order.next_index = NULL;
-//                         self.orders[bump_index as usize] = order;
-
-//                         self.bump_index += 1;
-
-//                         Some(bump_index)
-//                     } else {
-//                         None
-//                     }
-//                 }
-//             },
-//             Some(first_worst_order) => {
-//                 let slightly_better_order = self.orders[first_worse_order.prev_index as usize];
-
-
-
-
-
-//             }
-//         }
-//     }
-
-//     /// Iterate through the order list, returning the first order that has a
-//     /// worse price than `order`. Returns `None` if this order has a worse
-    /// price than every order in the list.
-//     fn get_first_worse_order(&self, order: Order) -> Option<Order> {
-//         let mut i = self.best_order_index;
-
-//         loop {
-//             let next_order = self.orders[i as usize];
-
-//             if next_order.amount == 0 || self.is_price_better(order, next_order) {
-//                 return Some(next_order);
-//             }
-
-//             if next_order.next_index == NULL {
-//                 return None;
-//             } else {
-//                 i = next_order.next_index;
-//             }
-//         }
-//     }
-
 
 /// To maximize cache hits and to minimize `OrderBook` size, this struct is
 /// as small as possible. Many of its fields are implied rather than encoded.
