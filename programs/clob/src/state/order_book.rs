@@ -55,7 +55,16 @@ impl Iterator for OrderListIterator<'_> {
 }
 
 impl OrderList {
-    pub fn insert_order(&mut self, mut order: Order) -> Option<u8> {
+    pub fn insert_order(&mut self, amount: u64, price: u64, market_maker_index: u8) -> Option<u8> {
+        let mut order = Order {
+            amount,
+            price,
+            market_maker_index,
+            next_idx: NULL,
+            prev_idx: NULL,
+            _padding: Default::default(),
+        };
+
         let mut iterator = OrderListIterator::new(self);
 
         // Iterate until finding an order with an inferior price. At that point,

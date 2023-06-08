@@ -82,7 +82,7 @@ pub struct TopUpBalance<'info> {
 }
 
 #[derive(Accounts)]
-pub struct SubmitLimitBuy<'info> {
+pub struct SubmitLimitOrder<'info> {
     #[account(mut)]
     pub order_book: AccountLoader<'info, OrderBook>,
     pub authority: Signer<'info>,

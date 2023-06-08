@@ -124,11 +124,12 @@ pub mod clob {
         Ok(())
     }
 
-    pub fn submit_limit_buy(
-        ctx: Context<SubmitLimitBuy>,
+    pub fn submit_limit_order(
+        ctx: Context<SubmitLimitOrder>,
+        side: Side,
         amount_in: u64,
         price: u64,
-        market_maker_index: u32,
+        market_maker_index: u8,
     ) -> Result<()> {
         // TODO: add cluster restart logic, preventing take orders within x
         // slots of restart
@@ -142,19 +143,28 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        market_maker
-            .quote_balance
-            .checked_sub(amount_in)
-            .ok_or(CLOBError::InsufficientBalance)?;
+        match side {
+            Side::Buy => {
+                market_maker.quote_balance = market_maker
+                    .quote_balance
+                    .checked_sub(amount_in)
+                    .ok_or(CLOBError::InsufficientBalance)?;
 
-        order_book.buys.insert_order(Order {
-            price,
-            _padding: Default::default(),
-            market_maker_index: market_maker_index as u8,
-            amount: amount_in,
-            prev_idx: NULL,
-            next_idx: NULL,
-        });
+                order_book
+                    .buys
+                    .insert_order(amount_in, price, market_maker_index);
+            }
+            Side::Sell => {
+                market_maker.base_balance = market_maker
+                    .base_balance
+                    .checked_sub(amount_in)
+                    .ok_or(CLOBError::InsufficientBalance)?;
+
+                order_book
+                    .sells
+                    .insert_order(amount_in, price, market_maker_index);
+            }
+        }
 
         Ok(())
     }
