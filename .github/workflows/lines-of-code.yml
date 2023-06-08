@@ -1,0 +1,12 @@
+name: Count Lines of Code
+
+on:
+  push
+
+jobs:
+  cloc:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: djdefi/cloc-action@5
