@@ -8,6 +8,6 @@ pub enum CLOBError {
     UnauthorizedMarketMaker,
     #[msg("This market maker has insufficient balance for this limit order")]
     InsufficientBalance,
-    #[msg("This limit order's price was not good enough to land on the order book.")]
+    #[msg("This limit order's price was not good enough to land on the order book")]
     InferiorPrice,
 }
