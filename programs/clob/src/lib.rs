@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
-// use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::log::sol_log_compute_units;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -209,7 +209,7 @@ pub mod clob {
         amount_in: u64,
         price: u64,
         market_maker_index: u8,
-    ) -> Result<()> {
+    ) -> Result<u8> {
         // TODO: add cluster restart logic, preventing take orders within x
         // slots of restart
 
@@ -222,7 +222,7 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        match side {
+        let order_idx = match side {
             Side::Buy => {
                 market_maker.quote_balance = market_maker
                     .quote_balance
@@ -231,7 +231,7 @@ pub mod clob {
 
                 order_book
                     .buys
-                    .insert_order(amount_in, price, market_maker_index);
+                    .insert_order(amount_in, price, market_maker_index)
             }
             Side::Sell => {
                 market_maker.base_balance = market_maker
@@ -241,10 +241,10 @@ pub mod clob {
 
                 order_book
                     .sells
-                    .insert_order(amount_in, price, market_maker_index);
+                    .insert_order(amount_in, price, market_maker_index)
             }
-        }
+        };
 
-        Ok(())
+        order_idx.ok_or(error!(CLOBError::InferiorPrice))
     }
 }
