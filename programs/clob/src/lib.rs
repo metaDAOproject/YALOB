@@ -93,6 +93,8 @@ pub mod clob {
     ) -> Result<()> {
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+
         if base_amount > 0 {
             token::transfer(
                 CpiContext::new(
@@ -105,6 +107,8 @@ pub mod clob {
                 ),
                 base_amount,
             )?;
+
+            market_maker.base_balance += base_amount;
         }
 
         if quote_amount > 0 {
@@ -119,12 +123,9 @@ pub mod clob {
                 ),
                 quote_amount,
             )?;
+
+            market_maker.quote_balance += quote_amount;
         }
-
-        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
-
-        market_maker.base_balance += base_amount;
-        market_maker.quote_balance += quote_amount;
 
         Ok(())
     }
