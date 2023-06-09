@@ -97,7 +97,7 @@ describe("CLOB", () => {
     );
 
     await token.mintTo(connection, payer, base, mmBase, mintAuthority, 100000);
-    await token.mintTo(connection, payer, quote, mmQuote, mintAuthority, 10000);
+    await token.mintTo(connection, payer, quote, mmQuote, mintAuthority, 100000);
 
     await program.methods
       .addMarketMaker(marketMaker.publicKey, 0)
@@ -110,7 +110,7 @@ describe("CLOB", () => {
       .rpc();
 
     await program.methods
-      .topUpBalance(0, new anchor.BN(10_000), new anchor.BN(1_000))
+      .topUpBalance(0, new anchor.BN(10_000), new anchor.BN(100_000))
       .accounts({
         authority: marketMaker.publicKey,
         orderBook,
@@ -146,16 +146,16 @@ describe("CLOB", () => {
     
     console.log(await token.getAccount(connection, mmBase));
 
-    // for (let i = 0; i < 200; i++) {
-    //   await program.methods.submitLimitBuy(new anchor.BN(101), new anchor.BN(1e9+1), 0)
-    //     .accounts({
-    //       authority: marketMaker.publicKey,
-    //       orderBook,
-    //     })
-    //     .signers([marketMaker])
-    //     .rpc();
+    for (let i = 0; i < 150; i++) {
+      await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 0)
+        .accounts({
+          authority: marketMaker.publicKey,
+          orderBook,
+        })
+        .signers([marketMaker])
+        .rpc();
 
-    // }
+    }
 
     // let ob = await program.account.orderBook.fetch(orderBook);
 

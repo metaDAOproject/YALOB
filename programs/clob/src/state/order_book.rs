@@ -74,7 +74,7 @@ impl OrderList {
         // Iterate until finding an order with an inferior price. At that point,
         // insert this order between it and the order from the previous iteration.
         let mut prev_iteration_order: Option<(Order, u8)> = None;
-        while let Some((mut book_order, book_order_idx)) = iterator.next() {
+        while let Some((book_order, book_order_idx)) = iterator.next() {
             if self.is_price_better(order, book_order) {
                 let order_idx = self.free_bitmap.get_first_free_chunk().unwrap_or_else(|| {
                     // If no space remains, remove the worst-priced order from
@@ -85,28 +85,21 @@ impl OrderList {
                     i as usize
                 });
 
-                if let Some((mut prev_order, prev_order_idx)) = prev_iteration_order {
-                    prev_order.next_idx = order_idx as u8;
-                    self.orders[prev_order_idx as usize] = prev_order;
-                    order.prev_idx = prev_order_idx;
-                } else {
-                    self.best_order_idx = order_idx as u8;
-                    order.prev_idx = NULL;
-                }
+                order.prev_idx = match prev_iteration_order {
+                    Some((_, prev_order_idx)) => prev_order_idx,
+                    None => NULL,
+                };
 
                 // This may evaluate to false in the rare event that this order
                 // is the last one to place on the book, and the previous
                 // `delete_order` removed `book_order`.
-                if self.orders[book_order_idx as usize].amount > 0 {
-                    book_order.prev_idx = order_idx as u8;
-                    self.orders[book_order_idx as usize] = book_order;
-                    order.next_idx = book_order_idx;
+                order.next_idx = if self.orders[book_order_idx as usize].amount > 0 {
+                    book_order_idx
                 } else {
-                    self.worst_order_idx = order_idx as u8;
-                }
+                    NULL
+                };
 
-                self.orders[order_idx] = order;
-                self.free_bitmap.mark_reserved(order_idx as u8);
+                self.place_order(order, order_idx as u8);
 
                 return Some(order_idx as u8);
             }
@@ -118,25 +111,32 @@ impl OrderList {
         // book iff there is free space.
         self.free_bitmap.get_first_free_chunk().map(|free_chunk| {
             order.prev_idx = match prev_iteration_order {
-                Some((mut prev_order, prev_order_idx)) => {
-                    prev_order.next_idx = free_chunk as u8;
-                    self.orders[prev_order_idx as usize] = prev_order;
-                    prev_order_idx
-                }
-                None => {
-                    // This shall only arise when there are no orders on the book.
-                    self.best_order_idx = free_chunk as u8;
-                    NULL
-                }
+                Some((_, prev_order_idx)) => prev_order_idx,
+                None => NULL,
             };
             order.next_idx = NULL;
 
-            self.orders[free_chunk] = order;
-            self.free_bitmap.mark_reserved(free_chunk as u8);
-            self.worst_order_idx = free_chunk as u8;
+            self.place_order(order, free_chunk as u8);
 
             free_chunk as u8
         })
+    }
+
+    fn place_order(&mut self, order: Order, i: u8) {
+        if order.prev_idx == NULL {
+            self.best_order_idx = i;
+        } else {
+            self.orders[order.prev_idx as usize].next_idx = i;
+        }
+
+        if order.next_idx == NULL {
+            self.worst_order_idx = i;
+        } else {
+            self.orders[order.next_idx as usize].prev_idx = i;
+        }
+
+        self.orders[i as usize] = order;
+        self.free_bitmap.mark_reserved(i);
     }
 
     fn delete_order(&mut self, i: u8) {
