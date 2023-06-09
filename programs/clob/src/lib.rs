@@ -33,6 +33,9 @@ pub mod clob {
     pub fn initialize_order_book(ctx: Context<InitializeOrderBook>) -> Result<()> {
         let mut order_book = ctx.accounts.order_book.load_init()?;
 
+        order_book.base = ctx.accounts.base.key();
+        order_book.quote = ctx.accounts.quote.key();
+
         order_book.base_vault = ctx.accounts.base_vault.key();
         order_book.quote_vault = ctx.accounts.quote_vault.key();
 
@@ -45,6 +48,8 @@ pub mod clob {
         order_book.sells.free_bitmap = FreeBitmap::default();
         order_book.sells.best_order_idx = NULL;
         order_book.sells.worst_order_idx = NULL;
+
+        order_book.pda_bump = *ctx.bumps.get("order_book").unwrap();
 
         Ok(())
     }
@@ -120,6 +125,79 @@ pub mod clob {
 
         market_maker.base_balance += base_amount;
         market_maker.quote_balance += quote_amount;
+
+        Ok(())
+    }
+
+    pub fn withdraw_balance(
+        ctx: Context<WithdrawBalance>,
+        market_maker_index: u32,
+        base_amount: u64,
+        quote_amount: u64,
+    ) -> Result<()> {
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+
+        require!(
+            market_maker.authority == ctx.accounts.authority.key(),
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        // These debits cannot be inside the `if` blocks because we drop `order_book`
+        market_maker.base_balance = market_maker
+            .base_balance
+            .checked_sub(base_amount)
+            .ok_or(CLOBError::InsufficientBalance)?;
+
+        market_maker.quote_balance = market_maker
+            .quote_balance
+            .checked_sub(quote_amount)
+            .ok_or(CLOBError::InsufficientBalance)?;
+
+        // Copy these onto the stack before we drop `order_book`
+        let base = order_book.base;
+        let quote = order_book.quote;
+        let pda_bump = order_book.pda_bump;
+
+        let seeds = &[
+            b"order_book",
+            base.as_ref(),
+            quote.as_ref(),
+            &[pda_bump]
+        ];
+
+        drop(order_book);
+
+        if base_amount > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_progam.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.base_vault.to_account_info(),
+                        to: ctx.accounts.base_to.to_account_info(),
+                        authority: ctx.accounts.order_book.to_account_info(),
+                    },
+                    &[seeds]
+                ),
+                base_amount,
+            )?;
+        }
+
+        if quote_amount > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_progam.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.quote_vault.to_account_info(),
+                        to: ctx.accounts.quote_to.to_account_info(),
+                        authority: ctx.accounts.order_book.to_account_info(),
+                    },
+                    &[seeds]
+                ),
+                base_amount,
+            )?;
+        }
 
         Ok(())
     }

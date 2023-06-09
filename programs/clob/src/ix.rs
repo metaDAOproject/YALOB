@@ -82,6 +82,22 @@ pub struct TopUpBalance<'info> {
 }
 
 #[derive(Accounts)]
+pub struct WithdrawBalance<'info> {
+    #[account(mut, has_one = base_vault, has_one = quote_vault)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub base_to: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_to: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub base_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_vault: Account<'info, TokenAccount>,
+    pub token_progam: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
 pub struct SubmitLimitOrder<'info> {
     #[account(mut)]
     pub order_book: AccountLoader<'info, OrderBook>,

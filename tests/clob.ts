@@ -131,6 +131,21 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
+    await program.methods.withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
+      .accounts({
+        authority: marketMaker.publicKey,
+        orderBook,
+        baseTo: mmBase,
+        quoteTo: mmQuote,
+        baseVault,
+        quoteVault,
+        tokenProgam: token.TOKEN_PROGRAM_ID,
+      })
+      .signers([marketMaker])
+      .rpc();
+    
+    console.log(await token.getAccount(connection, mmBase));
+
     // for (let i = 0; i < 200; i++) {
     //   await program.methods.submitLimitBuy(new anchor.BN(101), new anchor.BN(1e9+1), 0)
     //     .accounts({
@@ -142,10 +157,10 @@ describe("CLOB", () => {
 
     // }
 
-    let ob = await program.account.orderBook.fetch(orderBook);
+    // let ob = await program.account.orderBook.fetch(orderBook);
 
-    console.log(ob.buys);
-    console.log(ob.marketMakers);
+    // console.log(ob.buys);
+    // console.log(ob.marketMakers);
 
   });
 });

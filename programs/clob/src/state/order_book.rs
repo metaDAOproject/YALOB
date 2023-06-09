@@ -7,11 +7,15 @@ pub const NUM_MARKET_MAKERS: usize = 64;
 
 #[account(zero_copy)]
 pub struct OrderBook {
+    pub base: Pubkey,
+    pub quote: Pubkey,
     pub base_vault: Pubkey,
     pub quote_vault: Pubkey,
     pub buys: OrderList,
     pub sells: OrderList,
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
+    pub pda_bump: u8,
+    pub _padding: [u8; 7],
 }
 
 #[zero_copy]
