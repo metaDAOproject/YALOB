@@ -146,15 +146,15 @@ describe("CLOB", () => {
     
     console.log(await token.getAccount(connection, mmBase));
 
-    // for (let i = 0; i < 100; i++) {
-    //   await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 13, 0)
-    //     .accounts({
-    //       authority: marketMaker.publicKey,
-    //       orderBook,
-    //     })
-    //     .signers([marketMaker])
-    //     .rpc();
-    // }
+    for (let i = 0; i < 10; i++) {
+      await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 13, 0)
+        .accounts({
+          authority: marketMaker.publicKey,
+          orderBook,
+        })
+        .signers([marketMaker])
+        .rpc();
+    }
 
     let orderIndex = await program.methods.getOrderIndex({buy: {}}, 12, 0)
       .accounts({

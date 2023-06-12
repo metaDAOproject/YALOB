@@ -28,6 +28,12 @@ pub struct OrderList {
     pub orders: [Order; BOOK_DEPTH],
 }
 
+impl OrderList {
+    pub fn iter(&self) -> OrderListIterator {
+        OrderListIterator::new(self)
+    }
+}
+
 pub struct OrderListIterator<'a> {
     i: u8,
     orders: &'a [Order],
@@ -70,12 +76,10 @@ impl OrderList {
             _padding: Default::default(),
         };
 
-        let mut iterator = OrderListIterator::new(self);
-
         // Iterate until finding an order with an inferior price. At that point,
         // insert this order between it and the order from the previous iteration.
         let mut prev_iteration_order: Option<(Order, u8)> = None;
-        while let Some((book_order, book_order_idx)) = iterator.next() {
+        for (book_order, book_order_idx) in self.iter() {
             if self.is_price_better(order, book_order) {
                 let order_idx = self.free_bitmap.get_first_free_chunk().unwrap_or_else(|| {
                     // If no space remains, remove the worst-priced order from

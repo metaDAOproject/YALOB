@@ -291,9 +291,8 @@ pub mod clob {
             Side::Buy => order_book.buys,
             Side::Sell => order_book.sells,
         };
-        let iterator = OrderListIterator::new(&order_list);
 
-        for (order, order_idx) in iterator {
+        for (order, order_idx) in order_list.iter() {
             if order.ref_id == ref_id && order.market_maker_index == market_maker_index {
                 return Ok(Some(order_idx))
             }
@@ -308,14 +307,13 @@ pub mod clob {
             Side::Buy => order_book.buys,
             Side::Sell => order_book.sells,
         };
-        let mut iterator = OrderListIterator::new(&order_list);
 
         let max_returnable = (solana_program::program::MAX_RETURN_DATA - size_of::<u32>())
             / size_of::<ClientOrder>();
 
         let mut orders = Vec::with_capacity(max_returnable);
 
-        while let Some((order, _)) = iterator.next() {
+        for (order, _) in order_list.iter() {
             orders.push(ClientOrder {
                 amount: order.amount,
                 price: order.price,
