@@ -59,10 +59,11 @@ impl Iterator for OrderListIterator<'_> {
 }
 
 impl OrderList {
-    pub fn insert_order(&mut self, amount: u64, price: u64, market_maker_index: u8) -> Option<u8> {
+    pub fn insert_order(&mut self, amount: u64, price: u64, ref_id: u32, market_maker_index: u8) -> Option<u8> {
         let mut order = Order {
             amount,
             price,
+            ref_id,
             market_maker_index,
             next_idx: NULL,
             prev_idx: NULL,
@@ -139,7 +140,7 @@ impl OrderList {
         self.free_bitmap.mark_reserved(i);
     }
 
-    fn delete_order(&mut self, i: u8) {
+    pub fn delete_order(&mut self, i: u8) {
         // TODO credit the mm back the tokens
 
         let order = self.orders[i as usize];
@@ -182,7 +183,8 @@ pub struct Order {
     pub next_idx: u8,
     pub prev_idx: u8,
     pub market_maker_index: u8,
-    pub _padding: [u8; 5],
+    pub _padding: [u8; 1],
+    pub ref_id: u32,
     pub price: u64,
     pub amount: u64,
 }

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
 use std::mem::size_of;
+use solana_program::log::sol_log_compute_units;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -203,6 +204,7 @@ pub mod clob {
         side: Side,
         amount_in: u64,
         price: u64,
+        ref_id: u32,
         market_maker_index: u8,
     ) -> Result<u8> {
         // TODO: add cluster restart logic, preventing take orders within x
@@ -226,7 +228,7 @@ pub mod clob {
 
                 order_book
                     .buys
-                    .insert_order(amount_in, price, market_maker_index)
+                    .insert_order(amount_in, price, ref_id, market_maker_index)
             }
             Side::Sell => {
                 market_maker.base_balance = market_maker
@@ -236,11 +238,44 @@ pub mod clob {
 
                 order_book
                     .sells
-                    .insert_order(amount_in, price, market_maker_index)
+                    .insert_order(amount_in, price, ref_id, market_maker_index)
             }
         };
 
         order_idx.ok_or(error!(CLOBError::InferiorPrice))
+    }
+
+    pub fn cancel_limit_order(
+        ctx: Context<CancelLimitOrder>,
+        side: Side,
+        order_index: u8,
+        market_maker_index: u8,
+    ) -> Result<()> {
+        sol_log_compute_units();
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+
+        require!(
+            market_maker.authority == ctx.accounts.authority.key(),
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        let order_list = match side {
+            Side::Buy => &mut order_book.buys,
+            Side::Sell => &mut order_book.sells,
+        };
+
+        let order = order_list.orders[order_index as usize];
+
+        require!(
+            order.market_maker_index == market_maker_index,
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        order_list.delete_order(order_index);
+
+        Ok(())
     }
 
     // Getter so that clients don't need to manually traverse the linked list
@@ -250,7 +285,24 @@ pub mod clob {
         pub price: u64,
     }
 
-    pub fn get_orders(ctx: Context<GetOrders>, side: Side) -> Result<Vec<ClientOrder>> {
+    pub fn get_order_index(ctx: Context<GetOrderIndex>, side: Side, ref_id: u32, market_maker_index: u8) -> Result<Option<u8>> {
+        let order_book = ctx.accounts.order_book.load()?;
+        let order_list = match side {
+            Side::Buy => order_book.buys,
+            Side::Sell => order_book.sells,
+        };
+        let iterator = OrderListIterator::new(&order_list);
+
+        for (order, order_idx) in iterator {
+            if order.ref_id == ref_id && order.market_maker_index == market_maker_index {
+                return Ok(Some(order_idx))
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub fn get_best_orders(ctx: Context<GetOrders>, side: Side) -> Result<Vec<ClientOrder>> {
         let order_book = ctx.accounts.order_book.load()?;
         let order_list = match side {
             Side::Buy => order_book.buys,

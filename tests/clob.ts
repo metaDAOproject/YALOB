@@ -123,7 +123,7 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(100), new anchor.BN(1e9), 0)
+    await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(100), new anchor.BN(1e9), 12, 0)
       .accounts({
         authority: marketMaker.publicKey,
         orderBook,
@@ -146,21 +146,38 @@ describe("CLOB", () => {
     
     console.log(await token.getAccount(connection, mmBase));
 
-    for (let i = 0; i < 100; i++) {
-      await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 0)
-        .accounts({
-          authority: marketMaker.publicKey,
-          orderBook,
-        })
-        .signers([marketMaker])
-        .rpc();
-    }
+    // for (let i = 0; i < 100; i++) {
+    //   await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 13, 0)
+    //     .accounts({
+    //       authority: marketMaker.publicKey,
+    //       orderBook,
+    //     })
+    //     .signers([marketMaker])
+    //     .rpc();
+    // }
 
-    let orders = await program.methods.getOrders({buy: {}})
-      .accounts({orderBook})
+    let orderIndex = await program.methods.getOrderIndex({buy: {}}, 12, 0)
+      .accounts({
+        orderBook
+      })
+      .view();
+
+    await program.methods.cancelLimitOrder({buy: {}}, orderIndex, 0)
+      .accounts({
+        orderBook,
+        authority: marketMaker.publicKey,
+      })
+      .signers([marketMaker])
+      .rpc();
+
+    let orders = await program.methods.getBestOrders({buy: {}})
+      .accounts({
+        orderBook,
+      })
       .view();
 
     console.log(orders);
+
 
     // let ix = await program.methods.getOrders({buy: {}})
     //   .accounts({orderBook})
