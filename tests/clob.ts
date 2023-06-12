@@ -146,7 +146,7 @@ describe("CLOB", () => {
     
     console.log(await token.getAccount(connection, mmBase));
 
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 100; i++) {
       await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 0)
         .accounts({
           authority: marketMaker.publicKey,
@@ -154,8 +154,27 @@ describe("CLOB", () => {
         })
         .signers([marketMaker])
         .rpc();
-
     }
+
+    let orders = await program.methods.getOrders({buy: {}})
+      .accounts({orderBook})
+      .view();
+
+    console.log(orders);
+
+    // let ix = await program.methods.getOrders({buy: {}})
+    //   .accounts({orderBook})
+    //   .instruction();
+    // let tx = new anchor.web3.Transaction();
+    // tx.add(ix);
+
+    // let res = await connection.simulateTransaction(tx, [payer]);
+    // console.log(res.value.returnData.data);
+
+    // const buf = Buffer.from(res.value.returnData.data[0], 'base64');
+
+
+    // console.log(program.coder.types.decode("ClientOrder", buf));
 
     // let ob = await program.account.orderBook.fetch(orderBook);
 

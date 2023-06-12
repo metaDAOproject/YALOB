@@ -103,3 +103,8 @@ pub struct SubmitLimitOrder<'info> {
     pub order_book: AccountLoader<'info, OrderBook>,
     pub authority: Signer<'info>,
 }
+
+#[derive(Accounts)]
+pub struct GetOrders<'info> {
+    pub order_book: AccountLoader<'info, OrderBook>,
+}

@@ -34,7 +34,7 @@ pub struct OrderListIterator<'a> {
 }
 
 impl<'a> OrderListIterator<'a> {
-    fn new(order_list: &'a OrderList) -> Self {
+    pub fn new(order_list: &'a OrderList) -> Self {
         Self {
             i: order_list.best_order_idx,
             orders: &order_list.orders,

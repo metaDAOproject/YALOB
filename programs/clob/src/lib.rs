@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
-use solana_program::log::sol_log_compute_units;
+use std::mem::size_of;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -161,12 +161,7 @@ pub mod clob {
         let quote = order_book.quote;
         let pda_bump = order_book.pda_bump;
 
-        let seeds = &[
-            b"order_book",
-            base.as_ref(),
-            quote.as_ref(),
-            &[pda_bump]
-        ];
+        let seeds = &[b"order_book", base.as_ref(), quote.as_ref(), &[pda_bump]];
 
         drop(order_book);
 
@@ -179,7 +174,7 @@ pub mod clob {
                         to: ctx.accounts.base_to.to_account_info(),
                         authority: ctx.accounts.order_book.to_account_info(),
                     },
-                    &[seeds]
+                    &[seeds],
                 ),
                 base_amount,
             )?;
@@ -194,7 +189,7 @@ pub mod clob {
                         to: ctx.accounts.quote_to.to_account_info(),
                         authority: ctx.accounts.order_book.to_account_info(),
                     },
-                    &[seeds]
+                    &[seeds],
                 ),
                 base_amount,
             )?;
@@ -246,5 +241,39 @@ pub mod clob {
         };
 
         order_idx.ok_or(error!(CLOBError::InferiorPrice))
+    }
+
+    // Getter so that clients don't need to manually traverse the linked list
+    #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+    pub struct ClientOrder {
+        pub amount: u64,
+        pub price: u64,
+    }
+
+    pub fn get_orders(ctx: Context<GetOrders>, side: Side) -> Result<Vec<ClientOrder>> {
+        let order_book = ctx.accounts.order_book.load()?;
+        let order_list = match side {
+            Side::Buy => order_book.buys,
+            Side::Sell => order_book.sells,
+        };
+        let mut iterator = OrderListIterator::new(&order_list);
+
+        let max_returnable = (solana_program::program::MAX_RETURN_DATA - size_of::<u32>())
+            / size_of::<ClientOrder>();
+
+        let mut orders = Vec::with_capacity(max_returnable);
+
+        while let Some((order, _)) = iterator.next() {
+            orders.push(ClientOrder {
+                amount: order.amount,
+                price: order.price,
+            });
+
+            if orders.len() == max_returnable {
+                break;
+            }
+        }
+
+        Ok(orders)
     }
 }
