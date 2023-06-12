@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
-use std::mem::size_of;
 use solana_program::log::sol_log_compute_units;
+use std::mem::size_of;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -296,7 +296,12 @@ pub mod clob {
         pub price: u64,
     }
 
-    pub fn get_order_index(ctx: Context<GetOrderIndex>, side: Side, ref_id: u32, market_maker_index: u8) -> Result<Option<u8>> {
+    pub fn get_order_index(
+        ctx: Context<GetOrderIndex>,
+        side: Side,
+        ref_id: u32,
+        market_maker_index: u8,
+    ) -> Result<Option<u8>> {
         let order_book = ctx.accounts.order_book.load()?;
         let order_list = match side {
             Side::Buy => order_book.buys,
@@ -305,7 +310,7 @@ pub mod clob {
 
         for (order, order_idx) in order_list.iter() {
             if order.ref_id == ref_id && order.market_maker_index == market_maker_index {
-                return Ok(Some(order_idx))
+                return Ok(Some(order_idx));
             }
         }
 

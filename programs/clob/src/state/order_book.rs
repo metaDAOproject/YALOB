@@ -74,7 +74,13 @@ impl Iterator for OrderListIterator<'_> {
 }
 
 impl OrderList {
-    pub fn insert_order(&mut self, amount: u64, price: u64, ref_id: u32, market_maker_index: u8) -> Option<u8> {
+    pub fn insert_order(
+        &mut self,
+        amount: u64,
+        price: u64,
+        ref_id: u32,
+        market_maker_index: u8,
+    ) -> Option<u8> {
         let mut order = Order {
             amount,
             price,
