@@ -212,37 +212,18 @@ pub mod clob {
 
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
-        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+        let market_maker = order_book.market_makers[market_maker_index as usize];
 
         require!(
             market_maker.authority == ctx.accounts.authority.key(),
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let order_idx = match side {
-            Side::Buy => {
-                market_maker.quote_balance = market_maker
-                    .quote_balance
-                    .checked_sub(amount_in)
-                    .ok_or(CLOBError::InsufficientBalance)?;
+        let order_list = order_book.order_list(side);
 
-                order_book
-                    .buys
-                    .insert_order(amount_in, price, ref_id, market_maker_index)
-            }
-            Side::Sell => {
-                market_maker.base_balance = market_maker
-                    .base_balance
-                    .checked_sub(amount_in)
-                    .ok_or(CLOBError::InsufficientBalance)?;
+        let order_idx = order_list.insert_order(amount_in, price, ref_id, market_maker_index);
 
-                order_book
-                    .sells
-                    .insert_order(amount_in, price, ref_id, market_maker_index)
-            }
-        };
-
-        order_idx.ok_or(error!(CLOBError::InferiorPrice))
+        order_idx.ok_or_else(|| error!(CLOBError::InferiorPrice))
     }
 
     pub fn cancel_limit_order(
@@ -261,10 +242,7 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let order_list = match side {
-            Side::Buy => &mut order_book.buys,
-            Side::Sell => &mut order_book.sells,
-        };
+        let order_list = order_book.order_list(side);
 
         let order = order_list.orders[order_index as usize];
 
@@ -295,10 +273,7 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let order_list = match side {
-            Side::Buy => &mut order_book.buys,
-            Side::Sell => &mut order_book.sells,
-        };
+        let order_list = order_book.order_list(side);
 
         let order = order_list.orders[order_index as usize];
 

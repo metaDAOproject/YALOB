@@ -18,6 +18,15 @@ pub struct OrderBook {
     pub _padding: [u8; 7],
 }
 
+impl OrderBook {
+    pub fn order_list(&mut self, side: Side) -> &mut OrderList {
+        match side {
+            Side::Buy => &mut self.buys,
+            Side::Sell => &mut self.sells,
+        }
+    }
+}
+
 #[zero_copy]
 pub struct OrderList {
     pub side: StoredSide,
