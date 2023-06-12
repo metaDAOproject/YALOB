@@ -80,7 +80,7 @@ impl OrderList {
         // insert this order between it and the order from the previous iteration.
         let mut prev_iteration_order: Option<(Order, u8)> = None;
         for (book_order, book_order_idx) in self.iter() {
-            if self.is_price_better(order, book_order) {
+            if self.is_price_better(order.price, book_order.price) {
                 let order_idx = self.free_bitmap.get_first_free_chunk().unwrap_or_else(|| {
                     // If no space remains, remove the worst-priced order from
                     // the order book, and store the current order in its chunk.
@@ -165,11 +165,11 @@ impl OrderList {
         self.free_bitmap.mark_free(i);
     }
 
-    /// Does `lhs` give a better price than `rhs`?
-    fn is_price_better(&self, lhs: Order, rhs: Order) -> bool {
+    /// Is `lhs` a better price than `rhs`?
+    fn is_price_better(&self, lhs: u64, rhs: u64) -> bool {
         match self.side.into() {
-            Side::Buy => lhs.price > rhs.price,
-            Side::Sell => lhs.price < rhs.price,
+            Side::Buy => lhs > rhs,
+            Side::Sell => lhs < rhs,
         }
     }
 }
