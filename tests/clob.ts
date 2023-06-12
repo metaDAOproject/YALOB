@@ -178,6 +178,43 @@ describe("CLOB", () => {
 
     console.log(orders);
 
+    await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(100), new anchor.BN(1e9), 12, 0)
+      .accounts({
+        authority: marketMaker.publicKey,
+        orderBook,
+      })
+      .signers([marketMaker])
+      .rpc();
+
+    orders = await program.methods.getBestOrders({buy: {}})
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    console.log(orders);
+
+    orderIndex = await program.methods.getOrderIndex({buy: {}}, 12, 0)
+      .accounts({
+        orderBook
+      })
+      .view();
+
+    await program.methods.updateLimitOrder({buy: {}}, orderIndex, new anchor.BN(102), new anchor.BN(1e9+2), 0)
+      .accounts({
+        orderBook,
+        authority: marketMaker.publicKey,
+      })
+      .signers([marketMaker])
+      .rpc();
+
+    orders = await program.methods.getBestOrders({buy: {}})
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    console.log(orders);
 
     // let ix = await program.methods.getOrders({buy: {}})
     //   .accounts({orderBook})

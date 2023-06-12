@@ -278,6 +278,42 @@ pub mod clob {
         Ok(())
     }
 
+    pub fn update_limit_order(
+        ctx: Context<UpdateLimitOrder>,
+        side: Side,
+        order_index: u8,
+        new_amount: u64,
+        new_price: u64,
+        market_maker_index: u8,
+    ) -> Result<()> {
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+
+        require!(
+            market_maker.authority == ctx.accounts.authority.key(),
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        let order_list = match side {
+            Side::Buy => &mut order_book.buys,
+            Side::Sell => &mut order_book.sells,
+        };
+
+        let order = order_list.orders[order_index as usize];
+
+        require!(
+            order.market_maker_index == market_maker_index,
+            CLOBError::UnauthorizedMarketMaker
+        );
+
+        // TODO: optimize
+        order_list.delete_order(order_index);
+        order_list.insert_order(new_amount, new_price, order.ref_id, market_maker_index);
+
+        Ok(())
+    }
+
     // Getter so that clients don't need to manually traverse the linked list
     #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
     pub struct ClientOrder {

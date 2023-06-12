@@ -112,6 +112,13 @@ pub struct CancelLimitOrder<'info> {
 }
 
 #[derive(Accounts)]
+pub struct UpdateLimitOrder<'info> {
+    #[account(mut)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct GetOrderIndex<'info> {
     pub order_book: AccountLoader<'info, OrderBook>,
 }
