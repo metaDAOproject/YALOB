@@ -139,7 +139,7 @@ describe("CLOB", () => {
         quoteTo: mmQuote,
         baseVault,
         quoteVault,
-        tokenProgam: token.TOKEN_PROGRAM_ID,
+        tokenProgram: token.TOKEN_PROGRAM_ID,
       })
       .signers([marketMaker])
       .rpc();
@@ -215,6 +215,29 @@ describe("CLOB", () => {
       .view();
 
     console.log(orders);
+
+    await program.methods.submitTakeOrder({sell: {}}, new anchor.BN(500), new anchor.BN(1))
+      .accounts({
+        orderBook,
+        authority: marketMaker.publicKey,
+        userBaseAccount: mmBase,
+        userQuoteAccount: mmQuote,
+        globalState,
+        baseVault,
+        quoteVault,
+        tokenProgram: token.TOKEN_PROGRAM_ID,
+      })
+      .signers([marketMaker])
+      .rpc();
+
+    orders = await program.methods.getBestOrders({buy: {}})
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    console.log(orders);
+
 
     // let ix = await program.methods.getOrders({buy: {}})
     //   .accounts({orderBook})

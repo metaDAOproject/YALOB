@@ -94,7 +94,7 @@ pub struct WithdrawBalance<'info> {
     pub base_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub quote_vault: Account<'info, TokenAccount>,
-    pub token_progam: Program<'info, Token>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -116,6 +116,23 @@ pub struct UpdateLimitOrder<'info> {
     #[account(mut)]
     pub order_book: AccountLoader<'info, OrderBook>,
     pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitTakeOrder<'info> {
+    #[account(mut)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+    #[account(mut)]
+    pub user_base_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_quote_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub base_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_vault: Account<'info, TokenAccount>,
+    pub authority: Signer<'info>,
+    pub global_state: Account<'info, GlobalState>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]

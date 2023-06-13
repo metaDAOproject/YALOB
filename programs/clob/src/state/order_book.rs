@@ -19,6 +19,18 @@ pub struct OrderBook {
 }
 
 impl OrderBook {
+    pub fn get_opposite_side(
+        &mut self,
+        side: Side,
+    ) -> (&mut OrderList, &mut [MarketMaker; NUM_MARKET_MAKERS]) {
+        let maker_makers = &mut self.market_makers;
+        let list = match side {
+            Side::Buy => &mut self.sells,
+            Side::Sell => &mut self.buys,
+        };
+        (list, maker_makers)
+    }
+
     pub fn order_list(&mut self, side: Side) -> &mut OrderList {
         match side {
             Side::Buy => &mut self.buys,
@@ -63,7 +75,7 @@ impl Iterator for OrderListIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let i = self.i;
 
-        if i == NULL || self.orders[i as usize].amount == 0 {
+        if i == NULL || self.orders[i as usize].amount_in == 0 {
             None
         } else {
             let order = self.orders[i as usize];
@@ -82,7 +94,7 @@ impl OrderList {
         market_maker_index: u8,
     ) -> Option<u8> {
         let mut order = Order {
-            amount,
+            amount_in: amount,
             price,
             ref_id,
             market_maker_index,
@@ -113,7 +125,7 @@ impl OrderList {
                 // This may evaluate to false in the rare event that this order
                 // is the last one to place on the book, and the previous
                 // `delete_order` removed `book_order`.
-                order.next_idx = if self.orders[book_order_idx as usize].amount > 0 {
+                order.next_idx = if self.orders[book_order_idx as usize].amount_in > 0 {
                     book_order_idx
                 } else {
                     NULL
@@ -205,7 +217,7 @@ pub struct Order {
     pub _padding: [u8; 1],
     pub ref_id: u32,
     pub price: u64,
-    pub amount: u64,
+    pub amount_in: u64,
 }
 
 #[zero_copy]

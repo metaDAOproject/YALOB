@@ -14,6 +14,9 @@ use crate::error::CLOBError;
 use crate::ix::*;
 use crate::state::*;
 
+pub const PRICE_PRECISION: u128 = 1_000_000_000;
+pub const MAX_BPS: u16 = 10_000;
+
 #[program]
 pub mod clob {
     use super::*;
@@ -25,7 +28,7 @@ pub mod clob {
         let global_state = &mut ctx.accounts.global_state;
 
         global_state.fee_collector = fee_collector;
-        global_state.fee_in_bps = 15;
+        global_state.taker_fee_in_bps = 15;
         global_state.market_maker_burn_in_lamports = 1_000_000_000;
 
         Ok(())
@@ -169,7 +172,7 @@ pub mod clob {
         if base_amount > 0 {
             token::transfer(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_progam.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.base_vault.to_account_info(),
                         to: ctx.accounts.base_to.to_account_info(),
@@ -184,7 +187,7 @@ pub mod clob {
         if quote_amount > 0 {
             token::transfer(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_progam.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.quote_vault.to_account_info(),
                         to: ctx.accounts.quote_to.to_account_info(),
@@ -289,6 +292,136 @@ pub mod clob {
         Ok(())
     }
 
+    pub fn submit_take_order(
+        ctx: Context<SubmitTakeOrder>,
+        side: Side,
+        amount_in: u64,
+        min_out: u64,
+    ) -> Result<()> {
+        let global_state = &ctx.accounts.global_state;
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        // If the user is buying, the maker is selling. If the maker is
+        // selling, the user is buying.
+        let (order_list, market_makers) = order_book.get_opposite_side(side);
+
+        let (recieving_vault, sending_vault, user_from, user_to) = match side {
+            Side::Buy => (
+                &ctx.accounts.quote_vault,
+                &ctx.accounts.base_vault,
+                &ctx.accounts.user_quote_account,
+                &ctx.accounts.user_base_account,
+            ),
+            Side::Sell => (
+                &ctx.accounts.base_vault,
+                &ctx.accounts.quote_vault,
+                &ctx.accounts.user_base_account,
+                &ctx.accounts.user_quote_account,
+            ),
+        };
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: user_from.to_account_info(),
+                    to: recieving_vault.to_account_info(),
+                    authority: ctx.accounts.authority.to_account_info(),
+                },
+            ),
+            amount_in,
+        )?;
+
+        let mut user_amount_in = ((amount_in as u128)
+            * (MAX_BPS - global_state.taker_fee_in_bps) as u128)
+            / MAX_BPS as u128;
+        let mut user_amount_out = 0;
+        // We cannot delete the orders inside the loop because
+        // `order_list.iter()` holds an immutable borrow to the order list.
+        let mut filled_orders= Vec::new();
+
+        for (book_order, book_order_idx) in order_list.iter() {
+            let order_amount_available = book_order.amount_in as u128; // u128s prevent overflow
+            let order_price = book_order.price as u128;
+
+            // If an order is selling 10 BONK at a price of 2 USDC per BONK,
+            // the order can take up to 5 USDC (10 / 2). If an order is buying
+            // BONK with 10 USDC at a price of 2 USDC per BONK, the order can
+            // take up to 20 BONK (10 * 2).
+            let amount_order_can_absorb = match side {
+                Side::Buy => (order_amount_available * PRICE_PRECISION) / order_price,
+                Side::Sell => (order_amount_available * order_price) / PRICE_PRECISION,
+            };
+
+            // Can the book order absorb all of a user's input token?
+            if amount_order_can_absorb >= user_amount_in {
+                // If an order can absorb 15 USDC at a price of 3 USDC per BONK
+                // and a user is buying BONK with 6 USDC, the user should receive
+                // 2 BONK (6 / 3).
+                //
+                // If an order can absorb 20 BONK at a price of 3 USDC per BONK
+                // and a user is selling 10 BONK, the user should receive 30 
+                // USDC (10 * 3).
+                let user_to_receive = match side {
+                    Side::Buy => (user_amount_in * PRICE_PRECISION) / order_price,
+                    Side::Sell => (user_amount_in * order_price) / PRICE_PRECISION,
+                } as u64;
+                user_amount_out += user_to_receive;
+
+                order_list.orders[book_order_idx as usize].amount_in -= user_to_receive;
+
+                match side {
+                    Side::Buy => market_makers[book_order.market_maker_index as usize].quote_balance += user_amount_in as u64,
+                    Side::Sell => market_makers[book_order.market_maker_index as usize].base_balance += user_amount_in as u64,
+                };
+
+                break;
+            } else {
+                user_amount_in -= amount_order_can_absorb;
+                user_amount_out += order_amount_available as u64;
+
+                match side {
+                    Side::Buy => market_makers[book_order.market_maker_index as usize].quote_balance += amount_order_can_absorb as u64,
+                    Side::Sell => market_makers[book_order.market_maker_index as usize].base_balance += amount_order_can_absorb as u64,
+                };
+
+                filled_orders.push(book_order_idx);
+            }
+        }
+
+        for order_idx in filled_orders {
+            // These orders have been filled and as such the maker should not
+            // receive a token refund. 
+            order_list.orders[order_idx as usize].amount_in = 0;
+            order_list.delete_order(order_idx);
+        }
+
+        require!(user_amount_out >= min_out, CLOBError::TakeNotFilled);
+
+        let base = order_book.base;
+        let quote = order_book.quote;
+        let pda_bump = order_book.pda_bump;
+
+        let seeds = &[b"order_book", base.as_ref(), quote.as_ref(), &[pda_bump]];
+
+        drop(order_book);
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: sending_vault.to_account_info(),
+                    to: user_to.to_account_info(),
+                    authority: ctx.accounts.order_book.to_account_info(),
+                },
+                &[seeds],
+            ),
+            user_amount_out,
+        )?;
+
+        Ok(())
+    }
+
     // Getter so that clients don't need to manually traverse the linked list
     #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
     pub struct ClientOrder {
@@ -331,7 +464,7 @@ pub mod clob {
 
         for (order, _) in order_list.iter() {
             orders.push(ClientOrder {
-                amount: order.amount,
+                amount: order.amount_in,
                 price: order.price,
             });
 

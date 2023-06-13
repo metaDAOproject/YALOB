@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
 #[repr(u8)]
 pub enum Side {
     Buy = 0,
