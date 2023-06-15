@@ -54,6 +54,8 @@ pub mod clob {
         order_book.sells.best_order_idx = NULL;
         order_book.sells.worst_order_idx = NULL;
 
+        order_book.twap_oracle.max_observation_change_per_update_bps = 100;
+
         order_book.pda_bump = *ctx.bumps.get("order_book").unwrap();
 
         Ok(())

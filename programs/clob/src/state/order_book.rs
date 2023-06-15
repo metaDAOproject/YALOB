@@ -1,5 +1,5 @@
 use super::*;
-use std::default::Default;
+use std::{char::MAX, default::Default};
 
 pub const BOOK_DEPTH: usize = 128;
 pub const NULL: u8 = BOOK_DEPTH as u8;
@@ -55,7 +55,23 @@ impl OrderBook {
             let (best_bid, _) = best_bid.unwrap();
             let (best_offer, _) = best_offer.unwrap();
 
-            let observation = (best_bid.price + best_offer.price) / 2;
+            let spot_price = (best_bid.price + best_offer.price) / 2;
+
+            let observation = if oracle.last_updated_slot == 0 {
+                spot_price
+            } else if spot_price > oracle.last_observation {
+                let max_observation = (oracle.last_observation
+                    * (MAX_BPS + oracle.max_observation_change_per_update_bps) as u64)
+                    / MAX_BPS as u64;
+
+                std::cmp::min(spot_price, max_observation)
+            } else {
+                let min_observation = (oracle.last_observation
+                    * (MAX_BPS - oracle.max_observation_change_per_update_bps) as u64)
+                    / MAX_BPS as u64;
+
+                std::cmp::max(spot_price, min_observation)
+            };
 
             let weighted_observation = observation * (clock.slot - oracle.last_updated_slot);
 
@@ -73,6 +89,11 @@ pub struct TWAPOracle {
     pub last_updated_slot: u64,
     pub last_observation: u64,
     pub observation_aggregator: u128,
+    /// The most, in basis points, an observation can change per update.
+    /// For example, if it is 100 (1%), then the new observation can be between
+    /// last_observation * 0.99 and last_observation * 1.01
+    pub max_observation_change_per_update_bps: u16,
+    pub _padding: [u8; 6],
 }
 
 #[zero_copy]
