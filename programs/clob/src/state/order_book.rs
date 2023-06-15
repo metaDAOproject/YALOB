@@ -14,6 +14,7 @@ pub struct OrderBook {
     pub buys: OrderList,
     pub sells: OrderList,
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
+    pub twap_oracle: TWAPOracle,
     pub pda_bump: u8,
     pub _padding: [u8; 7],
 }
@@ -37,6 +38,41 @@ impl OrderBook {
             Side::Sell => &mut self.sells,
         }
     }
+
+    pub fn update_twap_oracle(&mut self) -> Result<()> {
+        let clock = Clock::get()?;
+
+        let oracle = &mut self.twap_oracle;
+
+        if clock.slot > oracle.last_updated_slot {
+            let best_bid = self.buys.iter().next();
+            let best_offer = self.sells.iter().next();
+
+            if best_bid.is_none() || best_offer.is_none() {
+                return Ok(());
+            }
+
+            let (best_bid, _) = best_bid.unwrap();
+            let (best_offer, _) = best_offer.unwrap();
+
+            let observation = (best_bid.price + best_offer.price) / 2;
+
+            let weighted_observation = observation * (clock.slot - oracle.last_updated_slot);
+
+            oracle.last_updated_slot = clock.slot;
+            oracle.last_observation = observation;
+            oracle.observation_aggregator += weighted_observation as u128;
+        }
+
+        Ok(())
+    }
+}
+
+#[zero_copy]
+pub struct TWAPOracle {
+    pub last_updated_slot: u64,
+    pub last_observation: u64,
+    pub observation_aggregator: u128,
 }
 
 #[zero_copy]

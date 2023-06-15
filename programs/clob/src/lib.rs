@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
+use solana_program::clock::Clock;
 use solana_program::log::sol_log_compute_units;
 use std::mem::size_of;
 
@@ -210,9 +211,6 @@ pub mod clob {
         ref_id: u32,
         market_maker_index: u8,
     ) -> Result<u8> {
-        // TODO: add cluster restart logic, preventing take orders within x
-        // slots of restart
-
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
         let market_maker = order_book.market_makers[market_maker_index as usize];
@@ -269,6 +267,8 @@ pub mod clob {
     ) -> Result<()> {
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
+        order_book.update_twap_oracle()?;
+
         let market_maker = &mut order_book.market_makers[market_maker_index as usize];
 
         require!(
@@ -298,8 +298,13 @@ pub mod clob {
         amount_in: u64,
         min_out: u64,
     ) -> Result<()> {
+        // TODO: add cluster restart logic, preventing take orders within x
+        // slots of restart
+
         let global_state = &ctx.accounts.global_state;
         let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        order_book.update_twap_oracle()?;
 
         // If the user is buying, the maker is selling. If the maker is
         // selling, the user is buying.
@@ -338,7 +343,7 @@ pub mod clob {
         let mut user_amount_out = 0;
         // We cannot delete the orders inside the loop because
         // `order_list.iter()` holds an immutable borrow to the order list.
-        let mut filled_orders= Vec::new();
+        let mut filled_orders = Vec::new();
 
         for (book_order, book_order_idx) in order_list.iter() {
             let order_amount_available = book_order.amount_in as u128; // u128s prevent overflow
@@ -360,7 +365,7 @@ pub mod clob {
                 // 2 BONK (6 / 3).
                 //
                 // If an order can absorb 20 BONK at a price of 3 USDC per BONK
-                // and a user is selling 10 BONK, the user should receive 30 
+                // and a user is selling 10 BONK, the user should receive 30
                 // USDC (10 * 3).
                 let user_to_receive = match side {
                     Side::Buy => (user_amount_in * PRICE_PRECISION) / order_price,
@@ -371,8 +376,14 @@ pub mod clob {
                 order_list.orders[book_order_idx as usize].amount_in -= user_to_receive;
 
                 match side {
-                    Side::Buy => market_makers[book_order.market_maker_index as usize].quote_balance += user_amount_in as u64,
-                    Side::Sell => market_makers[book_order.market_maker_index as usize].base_balance += user_amount_in as u64,
+                    Side::Buy => {
+                        market_makers[book_order.market_maker_index as usize].quote_balance +=
+                            user_amount_in as u64
+                    }
+                    Side::Sell => {
+                        market_makers[book_order.market_maker_index as usize].base_balance +=
+                            user_amount_in as u64
+                    }
                 };
 
                 break;
@@ -381,8 +392,14 @@ pub mod clob {
                 user_amount_out += order_amount_available as u64;
 
                 match side {
-                    Side::Buy => market_makers[book_order.market_maker_index as usize].quote_balance += amount_order_can_absorb as u64,
-                    Side::Sell => market_makers[book_order.market_maker_index as usize].base_balance += amount_order_can_absorb as u64,
+                    Side::Buy => {
+                        market_makers[book_order.market_maker_index as usize].quote_balance +=
+                            amount_order_can_absorb as u64
+                    }
+                    Side::Sell => {
+                        market_makers[book_order.market_maker_index as usize].base_balance +=
+                            amount_order_can_absorb as u64
+                    }
                 };
 
                 filled_orders.push(book_order_idx);
@@ -391,7 +408,7 @@ pub mod clob {
 
         for order_idx in filled_orders {
             // These orders have been filled and as such the maker should not
-            // receive a token refund. 
+            // receive a token refund.
             order_list.orders[order_idx as usize].amount_in = 0;
             order_list.delete_order(order_idx);
         }

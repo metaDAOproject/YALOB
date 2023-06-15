@@ -97,7 +97,14 @@ describe("CLOB", () => {
     );
 
     await token.mintTo(connection, payer, base, mmBase, mintAuthority, 100000);
-    await token.mintTo(connection, payer, quote, mmQuote, mintAuthority, 100000);
+    await token.mintTo(
+      connection,
+      payer,
+      quote,
+      mmQuote,
+      mintAuthority,
+      100000
+    );
 
     await program.methods
       .addMarketMaker(marketMaker.publicKey, 0)
@@ -123,7 +130,14 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(100), new anchor.BN(1e9), 12, 0)
+    await program.methods
+      .submitLimitOrder(
+        { buy: {} },
+        new anchor.BN(100),
+        new anchor.BN(1e9),
+        12,
+        0
+      )
       .accounts({
         authority: marketMaker.publicKey,
         orderBook,
@@ -131,7 +145,8 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    await program.methods.withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
+    await program.methods
+      .withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
       .accounts({
         authority: marketMaker.publicKey,
         orderBook,
@@ -143,11 +158,18 @@ describe("CLOB", () => {
       })
       .signers([marketMaker])
       .rpc();
-    
+
     console.log(await token.getAccount(connection, mmBase));
 
     for (let i = 0; i < 10; i++) {
-      await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(101), new anchor.BN(1e9+1), 13, 0)
+      await program.methods
+        .submitLimitOrder(
+          { sell: {} },
+          new anchor.BN(101),
+          new anchor.BN(1e9 + 1),
+          13,
+          0
+        )
         .accounts({
           authority: marketMaker.publicKey,
           orderBook,
@@ -156,13 +178,15 @@ describe("CLOB", () => {
         .rpc();
     }
 
-    let orderIndex = await program.methods.getOrderIndex({buy: {}}, 12, 0)
+    let orderIndex = await program.methods
+      .getOrderIndex({ buy: {} }, 12, 0)
       .accounts({
-        orderBook
+        orderBook,
       })
       .view();
 
-    await program.methods.cancelLimitOrder({buy: {}}, orderIndex, 0)
+    await program.methods
+      .cancelLimitOrder({ buy: {} }, orderIndex, 0)
       .accounts({
         orderBook,
         authority: marketMaker.publicKey,
@@ -170,7 +194,8 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    let orders = await program.methods.getBestOrders({buy: {}})
+    let orders = await program.methods
+      .getBestOrders({ buy: {} })
       .accounts({
         orderBook,
       })
@@ -178,7 +203,14 @@ describe("CLOB", () => {
 
     console.log(orders);
 
-    await program.methods.submitLimitOrder({buy: {}}, new anchor.BN(100), new anchor.BN(1e9), 12, 0)
+    await program.methods
+      .submitLimitOrder(
+        { buy: {} },
+        new anchor.BN(100),
+        new anchor.BN(1e9),
+        12,
+        0
+      )
       .accounts({
         authority: marketMaker.publicKey,
         orderBook,
@@ -186,7 +218,8 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    orders = await program.methods.getBestOrders({buy: {}})
+    orders = await program.methods
+      .getBestOrders({ buy: {} })
       .accounts({
         orderBook,
       })
@@ -194,13 +227,21 @@ describe("CLOB", () => {
 
     console.log(orders);
 
-    orderIndex = await program.methods.getOrderIndex({buy: {}}, 12, 0)
+    orderIndex = await program.methods
+      .getOrderIndex({ buy: {} }, 12, 0)
       .accounts({
-        orderBook
+        orderBook,
       })
       .view();
 
-    await program.methods.updateLimitOrder({buy: {}}, orderIndex, new anchor.BN(102), new anchor.BN(1e9+2), 0)
+    await program.methods
+      .updateLimitOrder(
+        { buy: {} },
+        orderIndex,
+        new anchor.BN(102),
+        new anchor.BN(1e9 + 2),
+        0
+      )
       .accounts({
         orderBook,
         authority: marketMaker.publicKey,
@@ -208,7 +249,8 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    orders = await program.methods.getBestOrders({buy: {}})
+    orders = await program.methods
+      .getBestOrders({ buy: {} })
       .accounts({
         orderBook,
       })
@@ -216,7 +258,8 @@ describe("CLOB", () => {
 
     console.log(orders);
 
-    await program.methods.submitTakeOrder({sell: {}}, new anchor.BN(500), new anchor.BN(1))
+    await program.methods
+      .submitTakeOrder({ sell: {} }, new anchor.BN(500), new anchor.BN(1))
       .accounts({
         orderBook,
         authority: marketMaker.publicKey,
@@ -230,14 +273,14 @@ describe("CLOB", () => {
       .signers([marketMaker])
       .rpc();
 
-    orders = await program.methods.getBestOrders({buy: {}})
+    orders = await program.methods
+      .getBestOrders({ buy: {} })
       .accounts({
         orderBook,
       })
       .view();
 
     console.log(orders);
-
 
     // let ix = await program.methods.getOrders({buy: {}})
     //   .accounts({orderBook})
@@ -250,13 +293,13 @@ describe("CLOB", () => {
 
     // const buf = Buffer.from(res.value.returnData.data[0], 'base64');
 
-
     // console.log(program.coder.types.decode("ClientOrder", buf));
 
-    // let ob = await program.account.orderBook.fetch(orderBook);
+    let ob = await program.account.orderBook.fetch(orderBook);
+
+    console.log(ob.twapOracle);
 
     // console.log(ob.buys);
     // console.log(ob.marketMakers);
-
   });
 });
