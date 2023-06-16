@@ -60,15 +60,35 @@ impl OrderBook {
             let observation = if oracle.last_updated_slot == 0 {
                 spot_price
             } else if spot_price > oracle.last_observation {
-                let max_observation = (oracle.last_observation
+                // There are two maxes imposed: the max per change, and the max per
+                // slot. We take the min of them to determine the max observation.
+                let max_observation_from_change = (oracle.last_observation
                     * (MAX_BPS + oracle.max_observation_change_per_update_bps) as u64)
                     / MAX_BPS as u64;
+                let max_observation_from_slots = (oracle.last_observation
+                    * (MAX_BPS as u64
+                        + (oracle.max_observation_change_per_slot_bps as u64
+                            * (clock.slot - oracle.last_updated_slot)))
+                        as u64)
+                    / MAX_BPS as u64;
+
+                let max_observation =
+                    std::cmp::min(max_observation_from_change, max_observation_from_slots);
 
                 std::cmp::min(spot_price, max_observation)
             } else {
-                let min_observation = (oracle.last_observation
+                let min_observation_from_change = (oracle.last_observation
                     * (MAX_BPS - oracle.max_observation_change_per_update_bps) as u64)
                     / MAX_BPS as u64;
+                let min_observation_from_slots = (oracle.last_observation
+                    * (MAX_BPS as u64
+                        - (oracle.max_observation_change_per_slot_bps as u64
+                            * (clock.slot - oracle.last_updated_slot)))
+                        as u64)
+                    / MAX_BPS as u64;
+
+                let min_observation =
+                    std::cmp::max(min_observation_from_change, min_observation_from_slots);
 
                 std::cmp::max(spot_price, min_observation)
             };
@@ -93,7 +113,12 @@ pub struct TWAPOracle {
     /// For example, if it is 100 (1%), then the new observation can be between
     /// last_observation * 0.99 and last_observation * 1.01
     pub max_observation_change_per_update_bps: u16,
-    pub _padding: [u8; 6],
+    /// The most, in basis points, an observation can change per slot.
+    /// For example, if it is 10 (0.1%) and it has been 3 slots since an update,
+    /// the new observation can be between last_observation * 0.997 and
+    /// last_observation * 1.003
+    pub max_observation_change_per_slot_bps: u16,
+    pub _padding: [u8; 4],
 }
 
 #[zero_copy]
