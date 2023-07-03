@@ -1,6 +1,6 @@
 ## YALOB
 
-**Y**et **a**nother **l**imit **o**rder **b**ook. This one is optimized for *simplicity and performance*. Materially, that manifests in the following ways:
+**Y**et **a**nother **l**imit **o**rder **b**ook. This one is optimized for *simplicity and performance*. That means:
 - ~1,000 lines of code instead of the typical ~10,000
 - basic data structures like linked lists and bitmaps instead of more complex ones like red-black trees or patricia tries
 - ~3,300 to ~5,800 CUs to submit and update limit orders, with a typical access pattern (frequent updates at the top of the book) leading to sub-4,000 CU consumption
