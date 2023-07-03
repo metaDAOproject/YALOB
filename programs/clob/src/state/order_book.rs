@@ -253,9 +253,11 @@ impl OrderList {
         self.free_bitmap.mark_reserved(i);
     }
 
-    pub fn delete_order(&mut self, i: u8) {
-        // TODO credit the mm back the tokens
-
+    /// Deletes an order from the order book and returns the contents of that order.
+    ///
+    /// It is the client's responsibility to credit any tokens to the relevant
+    /// maker.
+    pub fn delete_order(&mut self, i: u8) -> Order {
         let order = self.orders[i as usize];
 
         if i == self.best_order_idx {
@@ -272,6 +274,8 @@ impl OrderList {
 
         self.orders[i as usize] = Order::default();
         self.free_bitmap.mark_free(i);
+
+        order
     }
 
     /// Is `lhs` a better price than `rhs`?

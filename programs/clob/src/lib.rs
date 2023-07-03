@@ -215,6 +215,8 @@ pub mod clob {
     ) -> Result<u8> {
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
+        order_book.update_twap_oracle()?;
+
         let market_maker = order_book.market_makers[market_maker_index as usize];
 
         require!(
@@ -238,7 +240,9 @@ pub mod clob {
         sol_log_compute_units();
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
-        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+        order_book.update_twap_oracle()?;
+
+        let market_maker = order_book.market_makers[market_maker_index as usize];
 
         require!(
             market_maker.authority == ctx.accounts.authority.key(),
@@ -254,7 +258,18 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        order_list.delete_order(order_index);
+        let deleted_order = order_list.delete_order(order_index);
+
+        match side {
+            Side::Buy => {
+                order_book.market_makers[market_maker_index as usize].quote_balance +=
+                    deleted_order.amount_in
+            }
+            Side::Sell => {
+                order_book.market_makers[market_maker_index as usize].base_balance +=
+                    deleted_order.amount_in
+            }
+        };
 
         Ok(())
     }
@@ -287,8 +302,8 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        // TODO: optimize
-        order_list.delete_order(order_index);
+        // TODO: this could be optimized
+        let deleted_order = order_list.delete_order(order_index);
         order_list.insert_order(new_amount, new_price, order.ref_id, market_maker_index);
 
         Ok(())
@@ -411,9 +426,6 @@ pub mod clob {
         }
 
         for order_idx in filled_orders {
-            // These orders have been filled and as such the maker should not
-            // receive a token refund.
-            order_list.orders[order_idx as usize].amount_in = 0;
             order_list.delete_order(order_idx);
         }
 
