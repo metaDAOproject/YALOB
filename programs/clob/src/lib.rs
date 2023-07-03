@@ -237,7 +237,6 @@ pub mod clob {
         order_index: u8,
         market_maker_index: u8,
     ) -> Result<()> {
-        sol_log_compute_units();
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
         order_book.update_twap_oracle()?;
@@ -270,41 +269,6 @@ pub mod clob {
                     deleted_order.amount_in
             }
         };
-
-        Ok(())
-    }
-
-    pub fn update_limit_order(
-        ctx: Context<UpdateLimitOrder>,
-        side: Side,
-        order_index: u8,
-        new_amount: u64,
-        new_price: u64,
-        market_maker_index: u8,
-    ) -> Result<()> {
-        let mut order_book = ctx.accounts.order_book.load_mut()?;
-
-        order_book.update_twap_oracle()?;
-
-        let market_maker = &mut order_book.market_makers[market_maker_index as usize];
-
-        require!(
-            market_maker.authority == ctx.accounts.authority.key(),
-            CLOBError::UnauthorizedMarketMaker
-        );
-
-        let order_list = order_book.order_list(side);
-
-        let order = order_list.orders[order_index as usize];
-
-        require!(
-            order.market_maker_index == market_maker_index,
-            CLOBError::UnauthorizedMarketMaker
-        );
-
-        // TODO: this could be optimized
-        let deleted_order = order_list.delete_order(order_index);
-        order_list.insert_order(new_amount, new_price, order.ref_id, market_maker_index);
 
         Ok(())
     }
