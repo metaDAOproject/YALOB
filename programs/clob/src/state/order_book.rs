@@ -168,6 +168,10 @@ impl Iterator for OrderListIterator<'_> {
 }
 
 impl OrderList {
+    /// Try inserting an `Order` into the `OrderList`, returning the index of
+    /// the slot where the order was placed if it was placed.
+    /// 
+    /// It is the client's responsibility to debit the maker's tokens.
     pub fn insert_order(
         &mut self,
         amount: u64,

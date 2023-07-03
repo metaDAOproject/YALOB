@@ -228,7 +228,27 @@ pub mod clob {
 
         let order_idx = order_list.insert_order(amount_in, price, ref_id, market_maker_index);
 
-        order_idx.ok_or_else(|| error!(CLOBError::InferiorPrice))
+        if let Some(order_idx) = order_idx {
+            let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+            match side {
+                Side::Buy => {
+                    market_maker.quote_balance = market_maker
+                        .quote_balance
+                        .checked_sub(amount_in)
+                        .ok_or(CLOBError::InsufficientBalance)?;
+                }
+                Side::Sell => {
+                    market_maker.base_balance = market_maker
+                        .base_balance
+                        .checked_sub(amount_in)
+                        .ok_or(CLOBError::InsufficientBalance)?;
+                }
+            }
+
+            return Ok(order_idx);
+        } else {
+            return Err(error!(CLOBError::InferiorPrice));
+        }
     }
 
     pub fn cancel_limit_order(
