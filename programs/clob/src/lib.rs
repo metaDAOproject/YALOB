@@ -388,6 +388,8 @@ pub mod clob {
                     }
                 };
 
+                filled_orders.push(book_order_idx);
+
                 break;
             } else {
                 user_amount_in -= amount_order_can_absorb;
