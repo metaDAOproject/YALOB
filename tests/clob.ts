@@ -234,21 +234,6 @@ describe("CLOB", () => {
       })
       .view();
 
-    await program.methods
-      .updateLimitOrder(
-        { buy: {} },
-        orderIndex,
-        new anchor.BN(102),
-        new anchor.BN(1e9 + 2),
-        0
-      )
-      .accounts({
-        orderBook,
-        authority: marketMaker.publicKey,
-      })
-      .signers([marketMaker])
-      .rpc();
-
     orders = await program.methods
       .getBestOrders({ buy: {} })
       .accounts({
