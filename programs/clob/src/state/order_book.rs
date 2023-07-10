@@ -72,8 +72,18 @@ impl OrderBook {
                         as u64)
                     / MAX_BPS as u64;
 
+
+                // always round up 1 because of an edge case where the price 
+                // drops super low (e.g., 100), and can't climb back up because 
+                // 1.001 * 100 is still 100
                 let max_observation =
-                    std::cmp::min(max_observation_from_change, max_observation_from_slots);
+                    std::cmp::min(max_observation_from_change, max_observation_from_slots) + 1;
+
+                // this also means that TWAPs start getting more manipulation-prone
+                // around 100 and lower
+
+                // e.g., if 5 validators with 20 contiguous slots colluded, they could
+                // move the price by 20, which would be 20% at a price of 100
 
                 std::cmp::min(spot_price, max_observation)
             } else {
