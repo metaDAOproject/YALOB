@@ -301,13 +301,6 @@ impl OrderList {
     }
 }
 
-/// To maximize cache hits and to minimize `OrderBook` size, this struct is
-/// as small as possible. Many of its fields are implied rather than encoded.
-/// Specifically,
-/// * Whether it's a buy or sell is determined by whether it sits within `buys`
-///   or `sells`.
-/// * The amount of tokens that the market maker would receive if the order is
-///   filled = (amount * price) / 1e9.
 #[zero_copy]
 #[derive(Default)]
 pub struct Order {
@@ -316,13 +309,13 @@ pub struct Order {
     pub market_maker_index: u8,
     pub _padding: [u8; 1],
     pub ref_id: u32,
-    pub price: u64,
+    // if this order is filled, maker will receive (amount * price) / 1e9
+    pub price: u64, 
     pub amount_in: u64,
 }
 
 #[zero_copy]
 pub struct MarketMaker {
-    // 48 bytes
     pub base_balance: u64,
     pub quote_balance: u64,
     pub authority: Pubkey,
