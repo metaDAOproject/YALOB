@@ -14,7 +14,7 @@ describe("CLOB", () => {
 
   const program = anchor.workspace.Clob as Program<Clob>;
 
-  it("Passes tests", async () => {
+  it("Can be initialized", async () => {
     const [globalState] = anchor.web3.PublicKey.findProgramAddressSync(
       [anchor.utils.bytes.utf8.encode("WWCACOTMICMIBMHAFTTWYGHMB")],
       program.programId
@@ -80,211 +80,245 @@ describe("CLOB", () => {
       })
       .rpc();
 
-    const marketMaker = anchor.web3.Keypair.generate();
-
-    const mmBase = await token.createAccount(
+    const mm1 = await generateMarketMaker(
+	    0, // reside at 0th index
+      program,
       connection,
       payer,
+      globalState,
+      orderBook,
       base,
-      marketMaker.publicKey
-    );
-
-    const mmQuote = await token.createAccount(
-      connection,
-      payer,
       quote,
-      marketMaker.publicKey
-    );
-
-    await token.mintTo(connection, payer, base, mmBase, mintAuthority, 100000);
-    await token.mintTo(
-      connection,
-      payer,
-      quote,
-      mmQuote,
       mintAuthority,
-      100000
+      feeCollector
     );
 
-    await program.methods
-      .addMarketMaker(marketMaker.publicKey, 0)
-      .accounts({
-        orderBook,
-        payer: payer.publicKey,
-        globalState,
-        feeCollector: feeCollector.publicKey,
-      })
-      .rpc();
+    const mm2 = await generateMarketMaker(
+	    1, // reside at 1st index
+      program,
+      connection,
+      payer,
+      globalState,
+      orderBook,
+      base,
+      quote,
+      mintAuthority,
+      feeCollector
+    );
+    // await program.methods
+    //   .submitLimitOrder(
+    //     { buy: {} },
+    //     new anchor.BN(100),
+    //     new anchor.BN(1e9),
+    //     12,
+    //     0
+    //   )
+    //   .accounts({
+    //     authority: marketMaker.publicKey,
+    //     orderBook,
+    //   })
+    //   .signers([marketMaker])
+    //   .rpc();
 
-    await program.methods
-      .topUpBalance(0, new anchor.BN(10_000), new anchor.BN(100_000))
-      .accounts({
-        authority: marketMaker.publicKey,
-        orderBook,
-        baseFrom: mmBase,
-        quoteFrom: mmQuote,
-        baseVault,
-        quoteVault,
-        tokenProgam: token.TOKEN_PROGRAM_ID,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // await program.methods
+    //   .withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
+    //   .accounts({
+    //     authority: marketMaker.publicKey,
+    //     orderBook,
+    //     baseTo: mmBase,
+    //     quoteTo: mmQuote,
+    //     baseVault,
+    //     quoteVault,
+    //     tokenProgram: token.TOKEN_PROGRAM_ID,
+    //   })
+    //   .signers([marketMaker])
+    //   .rpc();
 
-    await program.methods
-      .submitLimitOrder(
-        { buy: {} },
-        new anchor.BN(100),
-        new anchor.BN(1e9),
-        12,
-        0
-      )
-      .accounts({
-        authority: marketMaker.publicKey,
-        orderBook,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // console.log(await token.getAccount(connection, mmBase));
 
-    await program.methods
-      .withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
-      .accounts({
-        authority: marketMaker.publicKey,
-        orderBook,
-        baseTo: mmBase,
-        quoteTo: mmQuote,
-        baseVault,
-        quoteVault,
-        tokenProgram: token.TOKEN_PROGRAM_ID,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // for (let i = 0; i < 10; i++) {
+    //   await program.methods
+    //     .submitLimitOrder(
+    //       { sell: {} },
+    //       new anchor.BN(101),
+    //       new anchor.BN(1e9 + 1),
+    //       13,
+    //       0
+    //     )
+    //     .accounts({
+    //       authority: marketMaker.publicKey,
+    //       orderBook,
+    //     })
+    //     .signers([marketMaker])
+    //     .rpc();
+    // }
 
-    console.log(await token.getAccount(connection, mmBase));
+    // let orderIndex = await program.methods
+    //   .getOrderIndex({ buy: {} }, 12, 0)
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    for (let i = 0; i < 10; i++) {
-      await program.methods
-        .submitLimitOrder(
-          { sell: {} },
-          new anchor.BN(101),
-          new anchor.BN(1e9 + 1),
-          13,
-          0
-        )
-        .accounts({
-          authority: marketMaker.publicKey,
-          orderBook,
-        })
-        .signers([marketMaker])
-        .rpc();
-    }
+    // await program.methods
+    //   .cancelLimitOrder({ buy: {} }, orderIndex, 0)
+    //   .accounts({
+    //     orderBook,
+    //     authority: marketMaker.publicKey,
+    //   })
+    //   .signers([marketMaker])
+    //   .rpc();
 
-    let orderIndex = await program.methods
-      .getOrderIndex({ buy: {} }, 12, 0)
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // let orders = await program.methods
+    //   .getBestOrders({ buy: {} })
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    await program.methods
-      .cancelLimitOrder({ buy: {} }, orderIndex, 0)
-      .accounts({
-        orderBook,
-        authority: marketMaker.publicKey,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // console.log(orders);
 
-    let orders = await program.methods
-      .getBestOrders({ buy: {} })
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // await program.methods
+    //   .submitLimitOrder(
+    //     { buy: {} },
+    //     new anchor.BN(100),
+    //     new anchor.BN(1e9),
+    //     12,
+    //     0
+    //   )
+    //   .accounts({
+    //     authority: marketMaker.publicKey,
+    //     orderBook,
+    //   })
+    //   .signers([marketMaker])
+    //   .rpc();
 
-    console.log(orders);
+    // orders = await program.methods
+    //   .getBestOrders({ buy: {} })
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    await program.methods
-      .submitLimitOrder(
-        { buy: {} },
-        new anchor.BN(100),
-        new anchor.BN(1e9),
-        12,
-        0
-      )
-      .accounts({
-        authority: marketMaker.publicKey,
-        orderBook,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // console.log(orders);
 
-    orders = await program.methods
-      .getBestOrders({ buy: {} })
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // orderIndex = await program.methods
+    //   .getOrderIndex({ buy: {} }, 12, 0)
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    console.log(orders);
+    // orders = await program.methods
+    //   .getBestOrders({ buy: {} })
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    orderIndex = await program.methods
-      .getOrderIndex({ buy: {} }, 12, 0)
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // console.log(orders);
 
-    orders = await program.methods
-      .getBestOrders({ buy: {} })
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // await program.methods
+    //   .submitTakeOrder({ sell: {} }, new anchor.BN(500), new anchor.BN(1))
+    //   .accounts({
+    //     orderBook,
+    //     authority: marketMaker.publicKey,
+    //     userBaseAccount: mmBase,
+    //     userQuoteAccount: mmQuote,
+    //     globalState,
+    //     baseVault,
+    //     quoteVault,
+    //     tokenProgram: token.TOKEN_PROGRAM_ID,
+    //   })
+    //   .signers([marketMaker])
+    //   .rpc();
 
-    console.log(orders);
+    // orders = await program.methods
+    //   .getBestOrders({ buy: {} })
+    //   .accounts({
+    //     orderBook,
+    //   })
+    //   .view();
 
-    await program.methods
-      .submitTakeOrder({ sell: {} }, new anchor.BN(500), new anchor.BN(1))
-      .accounts({
-        orderBook,
-        authority: marketMaker.publicKey,
-        userBaseAccount: mmBase,
-        userQuoteAccount: mmQuote,
-        globalState,
-        baseVault,
-        quoteVault,
-        tokenProgram: token.TOKEN_PROGRAM_ID,
-      })
-      .signers([marketMaker])
-      .rpc();
+    // console.log(orders);
 
-    orders = await program.methods
-      .getBestOrders({ buy: {} })
-      .accounts({
-        orderBook,
-      })
-      .view();
+    // // let ix = await program.methods.getOrders({buy: {}})
+    // //   .accounts({orderBook})
+    // //   .instruction();
+    // // let tx = new anchor.web3.Transaction();
+    // // tx.add(ix);
 
-    console.log(orders);
+    // // let res = await connection.simulateTransaction(tx, [payer]);
+    // // console.log(res.value.returnData.data);
 
-    // let ix = await program.methods.getOrders({buy: {}})
-    //   .accounts({orderBook})
-    //   .instruction();
-    // let tx = new anchor.web3.Transaction();
-    // tx.add(ix);
+    // // const buf = Buffer.from(res.value.returnData.data[0], 'base64');
 
-    // let res = await connection.simulateTransaction(tx, [payer]);
-    // console.log(res.value.returnData.data);
+    // // console.log(program.coder.types.decode("ClientOrder", buf));
 
-    // const buf = Buffer.from(res.value.returnData.data[0], 'base64');
+    // let ob = await program.account.orderBook.fetch(orderBook);
 
-    // console.log(program.coder.types.decode("ClientOrder", buf));
+    // console.log(ob.twapOracle);
 
-    let ob = await program.account.orderBook.fetch(orderBook);
-
-    console.log(ob.twapOracle);
-
-    // console.log(ob.buys);
-    // console.log(ob.marketMakers);
+    // // console.log(ob.buys);
+    // // console.log(ob.marketMakers);
   });
 });
+
+async function generateMarketMaker(
+	index: number,
+  program: Program<Clob>,
+  connection: anchor.Connection,
+  payer: anchor.web3.Keypair,
+  globalState: anchor.web3.PublicKey,
+  orderBook: anchor.web3.PublicKey,
+  base: anchor.web3.PublicKey,
+  quote: anchor.web3.PublicKey,
+  mintAuthority: anchor.web3.Keypair,
+  feeCollector: anchor.web3.Keypair,
+): anchor.web3.Keypair {
+  const mm = anchor.web3.Keypair.generate();
+
+  const mmBase = await token.createAccount(
+    connection,
+    payer,
+    base,
+    mm.publicKey
+  );
+
+  const mmQuote = await token.createAccount(
+    connection,
+    payer,
+    quote,
+    mm.publicKey
+  );
+
+  await token.mintTo(
+    connection,
+    payer,
+    base,
+    mmBase,
+    mintAuthority,
+    1_000_000_000
+  );
+
+  await token.mintTo(
+    connection,
+    payer,
+    quote,
+    mmQuote,
+    mintAuthority,
+    1_000_000_000
+  );
+
+  await program.methods
+    .addMarketMaker(mm.publicKey, index)
+    .accounts({
+      orderBook,
+      payer: payer.publicKey,
+      globalState,
+      feeCollector: feeCollector.publicKey,
+    })
+    .rpc();
+
+  return mm;
+}
