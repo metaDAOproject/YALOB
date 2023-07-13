@@ -136,11 +136,6 @@ pub struct SubmitTakeOrder<'info> {
 }
 
 #[derive(Accounts)]
-pub struct GetOrderIndex<'info> {
-    pub order_book: AccountLoader<'info, OrderBook>,
-}
-
-#[derive(Accounts)]
-pub struct GetOrders<'info> {
+pub struct Getter<'info> {
     pub order_book: AccountLoader<'info, OrderBook>,
 }

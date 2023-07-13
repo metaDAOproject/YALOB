@@ -12,4 +12,6 @@ pub enum CLOBError {
     InferiorPrice,
     #[msg("This take order could not be filled at this `min_out`")]
     TakeNotFilled,
+    #[msg("Unable to find this maker for this market")]
+    MakerNotFound,
 }

@@ -440,15 +440,35 @@ pub mod clob {
         Ok(())
     }
 
-    // Getter so that clients don't need to manually traverse the linked list
+    /**** GETTERS ****/
+
     #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
-    pub struct ClientOrder {
-        pub amount: u64,
-        pub price: u64,
+    pub struct MarketMakerBalances {
+        pub base_balance: u64,
+        pub quote_balance: u64,
+    }
+
+    pub fn get_market_maker_balances(
+        ctx: Context<Getter>,
+        maker_pubkey: Pubkey,
+    ) -> Result<MarketMakerBalances> {
+        let order_book = ctx.accounts.order_book.load()?;
+        let market_makers = &order_book.market_makers;
+
+        for market_maker in market_makers {
+            if market_maker.authority == maker_pubkey {
+                return Ok(MarketMakerBalances {
+                    base_balance: market_maker.base_balance,
+                    quote_balance: market_maker.quote_balance,
+                });
+            }
+        }
+
+        Err(error!(CLOBError::MakerNotFound))
     }
 
     pub fn get_order_index(
-        ctx: Context<GetOrderIndex>,
+        ctx: Context<Getter>,
         side: Side,
         ref_id: u32,
         market_maker_index: u8,
@@ -468,7 +488,13 @@ pub mod clob {
         Ok(None)
     }
 
-    pub fn get_best_orders(ctx: Context<GetOrders>, side: Side) -> Result<Vec<ClientOrder>> {
+    #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+    pub struct AmountAndPrice {
+        pub amount: u64,
+        pub price: u64,
+    }
+
+    pub fn get_best_orders(ctx: Context<Getter>, side: Side) -> Result<Vec<AmountAndPrice>> {
         let order_book = ctx.accounts.order_book.load()?;
         let order_list = match side {
             Side::Buy => order_book.buys,
@@ -476,12 +502,12 @@ pub mod clob {
         };
 
         let max_returnable = (solana_program::program::MAX_RETURN_DATA - size_of::<u32>())
-            / size_of::<ClientOrder>();
+            / size_of::<AmountAndPrice>();
 
         let mut orders = Vec::with_capacity(max_returnable);
 
         for (order, _) in order_list.iter() {
-            orders.push(ClientOrder {
+            orders.push(AmountAndPrice {
                 amount: order.amount_in,
                 price: order.price,
             });

@@ -81,7 +81,7 @@ describe("CLOB", () => {
       .rpc();
 
     const mm1 = await generateMarketMaker(
-	    0, // reside at 0th index
+      0, // reside at 0th index
       program,
       connection,
       payer,
@@ -94,7 +94,7 @@ describe("CLOB", () => {
     );
 
     const mm2 = await generateMarketMaker(
-	    1, // reside at 1st index
+      1, // reside at 1st index
       program,
       connection,
       payer,
@@ -105,6 +105,16 @@ describe("CLOB", () => {
       mintAuthority,
       feeCollector
     );
+
+    let mm1BalsBefore = await program.methods
+      .getMarketMakerBalances(mm1.publicKey)
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    console.log(mm1BalsBefore);
+
     // await program.methods
     //   .submitLimitOrder(
     //     { buy: {} },
@@ -265,7 +275,7 @@ describe("CLOB", () => {
 });
 
 async function generateMarketMaker(
-	index: number,
+  index: number,
   program: Program<Clob>,
   connection: anchor.Connection,
   payer: anchor.web3.Keypair,
@@ -274,7 +284,7 @@ async function generateMarketMaker(
   base: anchor.web3.PublicKey,
   quote: anchor.web3.PublicKey,
   mintAuthority: anchor.web3.Keypair,
-  feeCollector: anchor.web3.Keypair,
+  feeCollector: anchor.web3.Keypair
 ): anchor.web3.Keypair {
   const mm = anchor.web3.Keypair.generate();
 
