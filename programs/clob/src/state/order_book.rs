@@ -1,5 +1,5 @@
 use super::*;
-use std::{char::MAX, default::Default};
+use std::default::Default;
 
 pub const BOOK_DEPTH: usize = 128;
 pub const NULL: u8 = BOOK_DEPTH as u8;
@@ -72,9 +72,8 @@ impl OrderBook {
                         as u64)
                     / MAX_BPS as u64;
 
-
-                // always round up 1 because of an edge case where the price 
-                // drops super low (e.g., 100), and can't climb back up because 
+                // always round up 1 because of an edge case where the price
+                // drops super low (e.g., 100), and can't climb back up because
                 // 1.001 * 100 is still 100
                 let max_observation =
                     std::cmp::min(max_observation_from_change, max_observation_from_slots) + 1;
@@ -180,7 +179,7 @@ impl Iterator for OrderListIterator<'_> {
 impl OrderList {
     /// Try inserting an `Order` into the `OrderList`, returning the index of
     /// the slot where the order was placed if it was placed.
-    /// 
+    ///
     /// It is the client's responsibility to debit the maker's tokens.
     pub fn insert_order(
         &mut self,
@@ -310,7 +309,7 @@ pub struct Order {
     pub _padding: [u8; 1],
     pub ref_id: u32,
     // if this order is filled, maker will receive (amount * price) / 1e9
-    pub price: u64, 
+    pub price: u64,
     pub amount_in: u64,
 }
 

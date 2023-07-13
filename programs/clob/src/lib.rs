@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_spl::token;
 use solana_program::clock::Clock;
-use solana_program::log::sol_log_compute_units;
 use std::mem::size_of;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
@@ -61,6 +60,8 @@ pub mod clob {
         Ok(())
     }
 
+    // TODO: make it so that after one market maker has been added, we have to
+    // wait a configurable cooldown before we can add another
     pub fn add_market_maker(
         ctx: Context<AddMarketMaker>,
         market_maker: Pubkey,
