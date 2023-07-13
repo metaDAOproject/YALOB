@@ -106,7 +106,7 @@ pub mod clob {
         if base_amount > 0 {
             token::transfer(
                 CpiContext::new(
-                    ctx.accounts.token_progam.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.base_from.to_account_info(),
                         to: ctx.accounts.base_vault.to_account_info(),
@@ -122,7 +122,7 @@ pub mod clob {
         if quote_amount > 0 {
             token::transfer(
                 CpiContext::new(
-                    ctx.accounts.token_progam.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.quote_from.to_account_info(),
                         to: ctx.accounts.quote_vault.to_account_info(),

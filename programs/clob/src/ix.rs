@@ -78,7 +78,7 @@ pub struct TopUpBalance<'info> {
     pub base_vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub quote_vault: Account<'info, TokenAccount>,
-    pub token_progam: Program<'info, Token>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]

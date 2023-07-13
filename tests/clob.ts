@@ -4,6 +4,8 @@ import * as token from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { Clob } from "../target/types/clob";
 
+import { assert } from "chai";
+
 describe("CLOB", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -80,69 +82,83 @@ describe("CLOB", () => {
       })
       .rpc();
 
-    const mm1 = await generateMarketMaker(
+    const [mm0, mm0Base, mm0Quote] = await generateMarketMaker(
       0, // reside at 0th index
       program,
       connection,
       payer,
       globalState,
       orderBook,
+      baseVault,
+      quoteVault,
       base,
       quote,
       mintAuthority,
       feeCollector
     );
 
-    const mm2 = await generateMarketMaker(
+    const [mm1, mm1Base, mm1Quote] = await generateMarketMaker(
       1, // reside at 1st index
       program,
       connection,
       payer,
       globalState,
       orderBook,
+      baseVault,
+      quoteVault,
       base,
       quote,
       mintAuthority,
       feeCollector
     );
 
-    let mm1BalsBefore = await program.methods
-      .getMarketMakerBalances(mm1.publicKey)
+    let mm0BalsBefore = await program.methods
+      .getMarketMakerBalances(mm0.publicKey)
       .accounts({
         orderBook,
       })
       .view();
 
-    console.log(mm1BalsBefore);
+    await program.methods
+      .submitLimitOrder(
+        { buy: {} },
+        new anchor.BN(100), // amount
+        new anchor.BN(1e9), // price
+        12, // ref id
+        0 // mm index
+      )
+      .accounts({
+        authority: mm0.publicKey,
+        orderBook,
+      })
+      .signers([mm0])
+      .rpc();
 
-    // await program.methods
-    //   .submitLimitOrder(
-    //     { buy: {} },
-    //     new anchor.BN(100),
-    //     new anchor.BN(1e9),
-    //     12,
-    //     0
-    //   )
-    //   .accounts({
-    //     authority: marketMaker.publicKey,
-    //     orderBook,
-    //   })
-    //   .signers([marketMaker])
-    //   .rpc();
+    let mm0BalsAfter = await program.methods
+      .getMarketMakerBalances(mm0.publicKey)
+      .accounts({
+        orderBook,
+      })
+      .view();
 
-    // await program.methods
-    //   .withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
-    //   .accounts({
-    //     authority: marketMaker.publicKey,
-    //     orderBook,
-    //     baseTo: mmBase,
-    //     quoteTo: mmQuote,
-    //     baseVault,
-    //     quoteVault,
-    //     tokenProgram: token.TOKEN_PROGRAM_ID,
-    //   })
-    //   .signers([marketMaker])
-    //   .rpc();
+    assert.equal(
+      mm0BalsAfter.quoteBalance,
+        mm0BalsBefore.quoteBalance - new anchor.BN(100)
+    );
+
+    //await program.methods
+    //  .withdrawBalance(0, new anchor.BN(1000), new anchor.BN(0))
+    //  .accounts({
+    //    authority: mm0.publicKey,
+    //    orderBook,
+    //    baseTo: mm0Base,
+    //    quoteTo: mm0Quote,
+    //    baseVault,
+    //    quoteVault,
+    //    tokenProgram: token.TOKEN_PROGRAM_ID,
+    //  })
+    //  .signers([mm0])
+    //  .rpc();
 
     // console.log(await token.getAccount(connection, mmBase));
 
@@ -274,6 +290,9 @@ describe("CLOB", () => {
   });
 });
 
+const BASE_AMOUNT = 1_000_000_000;
+const QUOTE_AMOUNT = 1_000_000_000;
+
 async function generateMarketMaker(
   index: number,
   program: Program<Clob>,
@@ -281,11 +300,13 @@ async function generateMarketMaker(
   payer: anchor.web3.Keypair,
   globalState: anchor.web3.PublicKey,
   orderBook: anchor.web3.PublicKey,
+  baseVault: anchor.web3.PublicKey,
+  quoteVault: anchor.web3.PublicKey,
   base: anchor.web3.PublicKey,
   quote: anchor.web3.PublicKey,
   mintAuthority: anchor.web3.Keypair,
   feeCollector: anchor.web3.Keypair
-): anchor.web3.Keypair {
+): [anchor.web3.Keypair, anchor.web3.PublicKey, anchor.web3.PublicKey] {
   const mm = anchor.web3.Keypair.generate();
 
   const mmBase = await token.createAccount(
@@ -308,7 +329,7 @@ async function generateMarketMaker(
     base,
     mmBase,
     mintAuthority,
-    1_000_000_000
+    BASE_AMOUNT
   );
 
   await token.mintTo(
@@ -317,7 +338,7 @@ async function generateMarketMaker(
     quote,
     mmQuote,
     mintAuthority,
-    1_000_000_000
+    QUOTE_AMOUNT
   );
 
   await program.methods
@@ -330,5 +351,19 @@ async function generateMarketMaker(
     })
     .rpc();
 
-  return mm;
+  await program.methods
+    .topUpBalance(0, new anchor.BN(BASE_AMOUNT), new anchor.BN(QUOTE_AMOUNT))
+    .accounts({
+      orderBook,
+      authority: mm.publicKey,
+      baseFrom: mmBase,
+      quoteFrom: mmQuote,
+      baseVault,
+      quoteVault,
+      tokenProgram: token.TOKEN_PROGRAM_ID,
+    })
+    .signers([mm])
+    .rpc();
+
+  return [mm, mmBase, mmQuote];
 }
