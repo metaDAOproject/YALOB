@@ -243,25 +243,79 @@ describe("YALOB", () => {
       )
     );
 
+    let mm1BaseTokenBalanceBefore = (
+      await token.getAccount(connection, mm1Base)
+    ).amount;
+    let mm1QuoteTokenBalanceBefore = (
+      await token.getAccount(connection, mm1Quote)
+    ).amount;
+    let quoteVaultBalanceBefore = (
+      await token.getAccount(connection, quoteVault)
+    ).amount;
+
+    let mm0BalsBeforeTake = await program.methods
+      .getMarketMakerBalances(mm0.publicKey)
+      .accounts({
+        orderBook,
+      })
+      .view();
+
     // the limit order is for 300 at a price of 2, therefore 50 should cost 100
     await program.methods
       .submitTakeOrder(
         { buy: {} },
-        new anchor.BN(100), 
-        new anchor.BN(49), // allow round down to 49
+        new anchor.BN(100),
+        new anchor.BN(49) // allow round down to 49 bcuz taker fees
       )
       .accounts({
-	globalState,
-	userBaseAccount: mm1Base,
-	userQuoteAccount: mm1Quote,
-	baseVault,
-	quoteVault,
+        globalState,
+        userBaseAccount: mm1Base,
+        userQuoteAccount: mm1Quote,
+        baseVault,
+        quoteVault,
         authority: mm1.publicKey,
         orderBook,
-	tokenProgram: token.TOKEN_PROGRAM_ID,
+        tokenProgram: token.TOKEN_PROGRAM_ID,
       })
       .signers([mm1])
       .rpc();
+
+    let mm0BalsAfterTake = await program.methods
+      .getMarketMakerBalances(mm0.publicKey)
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    let mm1BaseTokenBalanceAfter = (await token.getAccount(connection, mm1Base))
+      .amount;
+    assert.isAtLeast(
+      Number(mm1BaseTokenBalanceAfter),
+      Number(mm1BaseTokenBalanceBefore) + 49
+    );
+
+    let mm1QuoteTokenBalanceAfter = (
+      await token.getAccount(connection, mm1Quote)
+    ).amount;
+    assert.equal(
+      Number(mm1QuoteTokenBalanceAfter),
+      Number(mm1QuoteTokenBalanceBefore) - 100
+    );
+
+    let quoteVaultBalanceAfter = (
+      await token.getAccount(connection, quoteVault)
+    ).amount;
+    assert.equal(
+      Number(quoteVaultBalanceAfter),
+      Number(quoteVaultBalanceBefore) + 100
+    );
+
+    assert(mm0BalsAfterTake.baseBalance.eq(mm0BalsBeforeTake.baseBalance));
+    assert(
+      mm0BalsAfterTake.quoteBalance.eq(
+        mm0BalsBeforeTake.quoteBalance.add(new anchor.BN(99)) // taker fee of 1
+      )
+    );
   });
 });
 

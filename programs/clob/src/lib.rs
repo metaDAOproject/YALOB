@@ -28,7 +28,7 @@ pub mod clob {
         let global_state = &mut ctx.accounts.global_state;
 
         global_state.fee_collector = fee_collector;
-        global_state.taker_fee_in_bps = 15;
+        global_state.taker_fee_in_bps = 10;
         global_state.market_maker_burn_in_lamports = 1_000_000_000;
 
         Ok(())
