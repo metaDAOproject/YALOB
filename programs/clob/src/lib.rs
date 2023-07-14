@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
-use anchor_spl::token;
 use solana_program::clock::Clock;
 use std::mem::size_of;
 
@@ -9,10 +8,12 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub mod error;
 pub mod ix;
 pub mod state;
+pub mod token_utils;
 
 use crate::error::CLOBError;
 use crate::ix::*;
 use crate::state::*;
+use crate::token_utils::{token_transfer, token_transfer_signed};
 
 pub const PRICE_PRECISION: u128 = 1_000_000_000;
 pub const MAX_BPS: u16 = 10_000;
@@ -64,9 +65,7 @@ pub mod clob {
         Ok(())
     }
 
-    pub fn sweep_fees(
-        ctx: Context<SweepFees>,
-    ) -> Result<()> {
+    pub fn sweep_fees(ctx: Context<SweepFees>) -> Result<()> {
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
         let base_amount = order_book.base_fees_sweepable;
@@ -84,40 +83,24 @@ pub mod clob {
 
         drop(order_book);
 
-        // TODO: factor out these transfers to a separate function
-        if base_amount > 0 {
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.base_vault.to_account_info(),
-                        to: ctx.accounts.base_to.to_account_info(),
-                        authority: ctx.accounts.order_book.to_account_info(),
-                    },
-                    &[seeds],
-                ),
-                base_amount,
-            )?;
-        }
+        token_transfer_signed(
+            base_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.base_vault,
+            &ctx.accounts.base_to,
+            &ctx.accounts.order_book,
+            seeds,
+        )?;
 
-        if quote_amount > 0 {
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.quote_vault.to_account_info(),
-                        to: ctx.accounts.quote_to.to_account_info(),
-                        authority: ctx.accounts.order_book.to_account_info(),
-                    },
-                    &[seeds],
-                ),
-                quote_amount,
-            )?;
-        }
-
-        Ok(())
+        token_transfer_signed(
+            quote_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.quote_vault,
+            &ctx.accounts.quote_to,
+            &ctx.accounts.order_book,
+            seeds,
+        )
     }
-
 
     // TODO: make it so that after one market maker has been added, we have to
     // wait a configurable cooldown before we can add another
@@ -162,37 +145,25 @@ pub mod clob {
 
         let market_maker = &mut order_book.market_makers[market_maker_index as usize];
 
-        if base_amount > 0 {
-            token::transfer(
-                CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.base_from.to_account_info(),
-                        to: ctx.accounts.base_vault.to_account_info(),
-                        authority: ctx.accounts.authority.to_account_info(),
-                    },
-                ),
-                base_amount,
-            )?;
+        token_transfer(
+            base_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.base_from,
+            &ctx.accounts.base_vault,
+            &ctx.accounts.authority,
+        )?;
 
-            market_maker.base_balance += base_amount;
-        }
+        market_maker.base_balance += base_amount;
 
-        if quote_amount > 0 {
-            token::transfer(
-                CpiContext::new(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.quote_from.to_account_info(),
-                        to: ctx.accounts.quote_vault.to_account_info(),
-                        authority: ctx.accounts.authority.to_account_info(),
-                    },
-                ),
-                quote_amount,
-            )?;
+        token_transfer(
+            quote_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.quote_from,
+            &ctx.accounts.quote_vault,
+            &ctx.accounts.authority,
+        )?;
 
-            market_maker.quote_balance += quote_amount;
-        }
+        market_maker.quote_balance += quote_amount;
 
         Ok(())
     }
@@ -232,37 +203,23 @@ pub mod clob {
 
         drop(order_book);
 
-        if base_amount > 0 {
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.base_vault.to_account_info(),
-                        to: ctx.accounts.base_to.to_account_info(),
-                        authority: ctx.accounts.order_book.to_account_info(),
-                    },
-                    &[seeds],
-                ),
-                base_amount,
-            )?;
-        }
+        token_transfer_signed(
+            base_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.base_vault,
+            &ctx.accounts.base_to,
+            &ctx.accounts.order_book,
+            seeds,
+        )?;
 
-        if quote_amount > 0 {
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.quote_vault.to_account_info(),
-                        to: ctx.accounts.quote_to.to_account_info(),
-                        authority: ctx.accounts.order_book.to_account_info(),
-                    },
-                    &[seeds],
-                ),
-                quote_amount,
-            )?;
-        }
-
-        Ok(())
+        token_transfer_signed(
+            quote_amount,
+            &ctx.accounts.token_program,
+            &ctx.accounts.quote_vault,
+            &ctx.accounts.quote_to,
+            &ctx.accounts.order_book,
+            seeds,
+        )
     }
 
     pub fn submit_limit_order(
@@ -362,6 +319,8 @@ pub mod clob {
         // TODO: add cluster restart logic, preventing take orders within x
         // slots of restart
 
+        assert!(amount_in > 0);
+
         let global_state = &ctx.accounts.global_state;
 
         let mut amount_in_after_fees = ((amount_in as u128)
@@ -372,7 +331,7 @@ pub mod clob {
 
         order_book.update_twap_oracle()?;
 
-        let (recieving_vault, sending_vault, user_from, user_to) = match side {
+        let (receiving_vault, sending_vault, user_from, user_to) = match side {
             Side::Buy => {
                 order_book.quote_fees_sweepable += amount_in - amount_in_after_fees as u64;
                 (
@@ -393,16 +352,12 @@ pub mod clob {
             }
         };
 
-        token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: user_from.to_account_info(),
-                    to: recieving_vault.to_account_info(),
-                    authority: ctx.accounts.authority.to_account_info(),
-                },
-            ),
+        token_transfer(
             amount_in,
+            &ctx.accounts.token_program,
+            &user_from,
+            &receiving_vault,
+            &ctx.accounts.authority,
         )?;
 
         let mut amount_out = 0;
@@ -489,20 +444,14 @@ pub mod clob {
 
         drop(order_book);
 
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: sending_vault.to_account_info(),
-                    to: user_to.to_account_info(),
-                    authority: ctx.accounts.order_book.to_account_info(),
-                },
-                &[seeds],
-            ),
+        token_transfer_signed(
             amount_out,
-        )?;
-
-        Ok(())
+            &ctx.accounts.token_program,
+            sending_vault,
+            user_to,
+            &ctx.accounts.order_book,
+            seeds,
+        )
     }
 
     /**** GETTERS ****/
