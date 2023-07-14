@@ -52,6 +52,24 @@ pub struct InitializeOrderBook<'info> {
 }
 
 #[derive(Accounts)]
+pub struct SweepFees<'info> {
+    #[account(has_one = fee_collector)]
+    pub global_state: Account<'info, GlobalState>,
+    pub fee_collector: Signer<'info>,
+    #[account(mut, has_one = base_vault, has_one = quote_vault)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+    #[account(mut)]
+    pub base_to: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_to: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub base_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub quote_vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
 pub struct AddMarketMaker<'info> {
     #[account(mut)]
     pub order_book: AccountLoader<'info, OrderBook>,

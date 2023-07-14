@@ -53,12 +53,71 @@ pub mod clob {
         order_book.sells.best_order_idx = NULL;
         order_book.sells.worst_order_idx = NULL;
 
+        // TODO: make this configurable via global state
         order_book.twap_oracle.max_observation_change_per_update_bps = 100;
+
+        order_book.base_fees_sweepable = 0;
+        order_book.quote_fees_sweepable = 0;
 
         order_book.pda_bump = *ctx.bumps.get("order_book").unwrap();
 
         Ok(())
     }
+
+    pub fn sweep_fees(
+        ctx: Context<SweepFees>,
+    ) -> Result<()> {
+        let mut order_book = ctx.accounts.order_book.load_mut()?;
+
+        let base_amount = order_book.base_fees_sweepable;
+        let quote_amount = order_book.quote_fees_sweepable;
+
+        order_book.base_fees_sweepable = 0;
+        order_book.quote_fees_sweepable = 0;
+
+        // Copy these onto the stack before we drop `order_book`
+        let base = order_book.base;
+        let quote = order_book.quote;
+        let pda_bump = order_book.pda_bump;
+
+        let seeds = &[b"order_book", base.as_ref(), quote.as_ref(), &[pda_bump]];
+
+        drop(order_book);
+
+        // TODO: factor out these transfers to a separate function
+        if base_amount > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.base_vault.to_account_info(),
+                        to: ctx.accounts.base_to.to_account_info(),
+                        authority: ctx.accounts.order_book.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                base_amount,
+            )?;
+        }
+
+        if quote_amount > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    token::Transfer {
+                        from: ctx.accounts.quote_vault.to_account_info(),
+                        to: ctx.accounts.quote_to.to_account_info(),
+                        authority: ctx.accounts.order_book.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                quote_amount,
+            )?;
+        }
+
+        Ok(())
+    }
+
 
     // TODO: make it so that after one market maker has been added, we have to
     // wait a configurable cooldown before we can add another
@@ -199,7 +258,7 @@ pub mod clob {
                     },
                     &[seeds],
                 ),
-                base_amount,
+                quote_amount,
             )?;
         }
 
@@ -304,27 +363,34 @@ pub mod clob {
         // slots of restart
 
         let global_state = &ctx.accounts.global_state;
+
+        let mut amount_in_after_fees = ((amount_in as u128)
+            * (MAX_BPS - global_state.taker_fee_in_bps) as u128)
+            / MAX_BPS as u128;
+
         let mut order_book = ctx.accounts.order_book.load_mut()?;
 
         order_book.update_twap_oracle()?;
 
-        // If the user is buying, the maker is selling. If the maker is
-        // selling, the user is buying.
-        let (order_list, market_makers) = order_book.get_opposite_side(side);
-
         let (recieving_vault, sending_vault, user_from, user_to) = match side {
-            Side::Buy => (
-                &ctx.accounts.quote_vault,
-                &ctx.accounts.base_vault,
-                &ctx.accounts.user_quote_account,
-                &ctx.accounts.user_base_account,
-            ),
-            Side::Sell => (
-                &ctx.accounts.base_vault,
-                &ctx.accounts.quote_vault,
-                &ctx.accounts.user_base_account,
-                &ctx.accounts.user_quote_account,
-            ),
+            Side::Buy => {
+                order_book.quote_fees_sweepable += amount_in - amount_in_after_fees as u64;
+                (
+                    &ctx.accounts.quote_vault,
+                    &ctx.accounts.base_vault,
+                    &ctx.accounts.user_quote_account,
+                    &ctx.accounts.user_base_account,
+                )
+            }
+            Side::Sell => {
+                order_book.base_fees_sweepable += amount_in - amount_in_after_fees as u64;
+                (
+                    &ctx.accounts.base_vault,
+                    &ctx.accounts.quote_vault,
+                    &ctx.accounts.user_base_account,
+                    &ctx.accounts.user_quote_account,
+                )
+            }
         };
 
         token::transfer(
@@ -339,13 +405,14 @@ pub mod clob {
             amount_in,
         )?;
 
-        let mut user_amount_in = ((amount_in as u128)
-            * (MAX_BPS - global_state.taker_fee_in_bps) as u128)
-            / MAX_BPS as u128;
-        let mut user_amount_out = 0;
+        let mut amount_out = 0;
         // We cannot delete the orders inside the loop because
         // `order_list.iter()` holds an immutable borrow to the order list.
         let mut filled_orders = Vec::new();
+
+        // If the user is buying, the maker is selling. If the maker is
+        // selling, the user is buying.
+        let (order_list, market_makers) = order_book.get_opposite_side(side);
 
         for (book_order, book_order_idx) in order_list.iter() {
             let order_amount_available = book_order.amount_in as u128; // u128s prevent overflow
@@ -361,7 +428,7 @@ pub mod clob {
             };
 
             // Can the book order absorb all of a user's input token?
-            if amount_order_can_absorb >= user_amount_in {
+            if amount_order_can_absorb >= amount_in_after_fees {
                 // If an order can absorb 15 USDC at a price of 3 USDC per BONK
                 // and a user is buying BONK with 6 USDC, the user should receive
                 // 2 BONK (6 / 3).
@@ -370,30 +437,28 @@ pub mod clob {
                 // and a user is selling 10 BONK, the user should receive 30
                 // USDC (10 * 3).
                 let user_to_receive = match side {
-                    Side::Buy => (user_amount_in * PRICE_PRECISION) / order_price,
-                    Side::Sell => (user_amount_in * order_price) / PRICE_PRECISION,
+                    Side::Buy => (amount_in_after_fees * PRICE_PRECISION) / order_price,
+                    Side::Sell => (amount_in_after_fees * order_price) / PRICE_PRECISION,
                 } as u64;
-                user_amount_out += user_to_receive;
+                amount_out += user_to_receive;
 
                 order_list.orders[book_order_idx as usize].amount_in -= user_to_receive;
 
                 match side {
                     Side::Buy => {
                         market_makers[book_order.market_maker_index as usize].quote_balance +=
-                            user_amount_in as u64
+                            amount_in_after_fees as u64
                     }
                     Side::Sell => {
                         market_makers[book_order.market_maker_index as usize].base_balance +=
-                            user_amount_in as u64
+                            amount_in_after_fees as u64
                     }
                 };
 
-                filled_orders.push(book_order_idx);
-
                 break;
             } else {
-                user_amount_in -= amount_order_can_absorb;
-                user_amount_out += order_amount_available as u64;
+                amount_in_after_fees -= amount_order_can_absorb;
+                amount_out += order_amount_available as u64;
 
                 match side {
                     Side::Buy => {
@@ -414,7 +479,7 @@ pub mod clob {
             order_list.delete_order(order_idx);
         }
 
-        require!(user_amount_out >= min_out, CLOBError::TakeNotFilled);
+        require!(amount_out >= min_out, CLOBError::TakeNotFilled);
 
         let base = order_book.base;
         let quote = order_book.quote;
@@ -434,7 +499,7 @@ pub mod clob {
                 },
                 &[seeds],
             ),
-            user_amount_out,
+            amount_out,
         )?;
 
         Ok(())

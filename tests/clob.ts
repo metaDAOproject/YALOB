@@ -230,6 +230,16 @@ describe("YALOB", () => {
       .signers([mm0])
       .rpc();
 
+    let sells = await program.methods
+      .getBestOrders({ sell: {} })
+      .accounts({
+        orderBook,
+      })
+      .view();
+    assert.equal(sells.length, 1);
+    assert(sells[0].amount.eq(new anchor.BN(300)));
+    assert(sells[0].price.eq(new anchor.BN(2e9)));
+
     mm0BalsAfter = await program.methods
       .getMarketMakerBalances(mm0.publicKey)
       .accounts({
@@ -316,6 +326,60 @@ describe("YALOB", () => {
         mm0BalsBeforeTake.quoteBalance.add(new anchor.BN(99)) // taker fee of 1
       )
     );
+
+    let ob = await program.account.orderBook.fetch(orderBook);
+    assert(ob.quoteFeesSweepable.eq(new anchor.BN(1)));
+
+    buys = await program.methods
+      .getBestOrders({ buy: {} })
+      .accounts({
+        orderBook,
+      })
+      .view();
+    assert.equal(buys.length, 2);
+
+    sells = await program.methods
+      .getBestOrders({ sell: {} })
+      .accounts({
+        orderBook,
+      })
+      .view();
+    assert.equal(sells.length, 1);
+    assert(sells[0].amount.eq(new anchor.BN(251)));
+    assert(sells[0].price.eq(new anchor.BN(2e9)));
+
+    const feeCollectorBase = await token.createAccount(
+      connection,
+      payer,
+      base,
+      feeCollector.publicKey
+    );
+
+    const feeCollectorQuote = await token.createAccount(
+      connection,
+      payer,
+      quote,
+      feeCollector.publicKey
+    );
+
+    await program.methods
+      .sweepFees()
+      .accounts({
+        globalState,
+        feeCollector: feeCollector.publicKey,
+        orderBook,
+        baseTo: feeCollectorBase,
+        quoteTo: feeCollectorQuote,
+        baseVault,
+        quoteVault,
+        tokenProgram: token.TOKEN_PROGRAM_ID,
+      })
+      .signers([feeCollector])
+      .rpc();
+
+    let quoteFeesSwept = (await token.getAccount(connection, feeCollectorQuote))
+      .amount;
+    assert.equal(1, Number(quoteFeesSwept));
   });
 });
 

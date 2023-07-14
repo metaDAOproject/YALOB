@@ -15,6 +15,8 @@ pub struct OrderBook {
     pub sells: OrderList,
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
     pub twap_oracle: TWAPOracle,
+    pub base_fees_sweepable: u64,
+    pub quote_fees_sweepable: u64,
     pub pda_bump: u8,
     pub _padding: [u8; 7],
 }
