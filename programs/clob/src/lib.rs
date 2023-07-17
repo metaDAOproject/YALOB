@@ -456,6 +456,12 @@ pub mod clob {
 
     /**** GETTERS ****/
 
+    pub fn get_twap(ctx: Context<Getter>) -> Result<TWAPOracle> {
+        let order_book = ctx.accounts.order_book.load()?;
+
+        Ok(order_book.twap_oracle)
+    }
+
     #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
     pub struct MarketMakerBalances {
         pub base_balance: u64,

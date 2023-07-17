@@ -115,6 +115,7 @@ impl OrderBook {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
 #[zero_copy]
 pub struct TWAPOracle {
     pub last_updated_slot: u64,

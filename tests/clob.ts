@@ -348,6 +348,62 @@ describe("YALOB", () => {
     assert(sells[0].amount.eq(new anchor.BN(251)));
     assert(sells[0].price.eq(new anchor.BN(2e9)));
 
+    let twap = await program.methods
+      .getTwap()
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    let startingSlot = twap.lastUpdatedSlot;
+    let startingLastObservation = twap.lastObservation;
+    let startingObservationAggregator = twap.observationAggregator;
+
+    for (let i = 0; i < 5; i++) {
+      await program.methods
+        .submitLimitOrder(
+          { sell: {} },
+          new anchor.BN(1000), // amount
+          new anchor.BN(3e9), // this price shouldn't affect anything
+          50 + i, // ref id
+          0 // mm index
+        )
+        .accounts({
+          authority: mm0.publicKey,
+          orderBook,
+        })
+        .signers([mm0])
+        .rpc();
+    }
+
+    twap = await program.methods
+      .getTwap()
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    let endingSlot = twap.lastUpdatedSlot;
+    let endingLastObservation = twap.lastObservation;
+    let endingObservationAggregator = twap.observationAggregator;
+
+    assert(endingLastObservation.eq(startingLastObservation));
+    assert(endingSlot.gt(startingSlot));
+
+    let slotsPassed = endingSlot.sub(startingSlot);
+
+    assert(slotsPassed.eqn(5));
+
+    let aggregatorDifference = endingObservationAggregator.sub(
+      startingObservationAggregator
+    );
+
+    let twapPrice = aggregatorDifference.div(slotsPassed);
+
+    let expectedPrice = new anchor.BN((1e9 + 2e9) / 2 + 1); // add the 1 bcuz it rounds up
+
+    assert(twapPrice.eq(expectedPrice));
+
     const feeCollectorBase = await token.createAccount(
       connection,
       payer,
