@@ -70,6 +70,22 @@ pub struct SweepFees<'info> {
 }
 
 #[derive(Accounts)]
+pub struct UpdateGlobalState<'info> {
+    #[account(mut, has_one = admin)]
+    pub global_state: Account<'info, GlobalState>,
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateOrderBook<'info> {
+    #[account(has_one = admin)]
+    pub global_state: Account<'info, GlobalState>,
+    pub admin: Signer<'info>,
+    #[account(mut)]
+    pub order_book: AccountLoader<'info, OrderBook>,
+}
+
+#[derive(Accounts)]
 pub struct AddMarketMaker<'info> {
     #[account(mut)]
     pub order_book: AccountLoader<'info, OrderBook>,

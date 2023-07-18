@@ -14,4 +14,6 @@ pub enum CLOBError {
     TakeNotFilled,
     #[msg("Unable to find this maker for this market")]
     MakerNotFound,
+    #[msg("The admin is trying to set a configurable to a disallowed value")]
+    DisallowedConfigValue,
 }

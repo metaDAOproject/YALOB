@@ -4,8 +4,9 @@ use super::*;
 pub struct GlobalState {
     /// Admins can do the following:
     /// - collect taker fees
-    /// - TODO: change TWAP parameters (within bounds)
-    /// - TODO: change min_amount
+    /// - change fees (within bounds)
+    /// - change TWAP parameters (within bounds)
+    /// - TODO: change min_{quote,base}_limit_amount
     pub admin: Pubkey,
     /// The CLOB needs fees to disincentivize wash trading / TWAP manipulation.
     /// Besides, profits are virtuous :)

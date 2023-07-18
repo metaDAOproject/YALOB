@@ -18,6 +18,11 @@ use crate::token_utils::{token_transfer, token_transfer_signed};
 pub const PRICE_PRECISION: u128 = 1_000_000_000;
 pub const MAX_BPS: u16 = 10_000;
 
+pub const MAX_TAKER_FEE_BPS: u16 = 50; // 0.5%
+                                       // These are not typos :)
+pub const MAX_MAX_OBSERVATION_CHANGE_PER_SLOT_BPS: u16 = 500; // 5%
+pub const MAX_MAX_OBSERVATION_CHANGE_PER_CHANGE_BPS: u16 = 1500; // 15%
+
 #[program]
 pub mod clob {
     use super::*;
@@ -31,6 +36,31 @@ pub mod clob {
         global_state.admin = admin;
         global_state.taker_fee_in_bps = 10;
         global_state.market_maker_burn_in_lamports = 1_000_000_000;
+
+        Ok(())
+    }
+
+    pub fn update_global_state(
+        ctx: Context<UpdateGlobalState>,
+        new_admin: Option<Pubkey>,
+        new_taker_fee_in_bps: Option<u16>,
+        new_market_maker_burn_in_lamports: Option<u64>,
+    ) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+
+        if let Some(new_admin) = new_admin {
+            global_state.admin = new_admin;
+        }
+        if let Some(new_taker_fee_in_bps) = new_taker_fee_in_bps {
+            require!(
+                new_taker_fee_in_bps <= MAX_TAKER_FEE_BPS,
+                CLOBError::DisallowedConfigValue
+            );
+            global_state.taker_fee_in_bps = new_taker_fee_in_bps;
+        }
+        if let Some(new_market_maker_burn_in_lamports) = new_market_maker_burn_in_lamports {
+            global_state.market_maker_burn_in_lamports = new_market_maker_burn_in_lamports;
+        }
 
         Ok(())
     }
@@ -62,6 +92,37 @@ pub mod clob {
         order_book.quote_fees_sweepable = 0;
 
         order_book.pda_bump = *ctx.bumps.get("order_book").unwrap();
+
+        Ok(())
+    }
+
+    pub fn update_order_book(
+        ctx: Context<UpdateOrderBook>,
+        new_max_observation_change_per_update_bps: Option<u16>,
+        new_max_observation_change_per_slot_bps: Option<u16>,
+    ) -> Result<()> {
+        let mut order_book = ctx.accounts.order_book.load_init()?;
+
+        if let Some(new_max_observation_change_per_update_bps) =
+            new_max_observation_change_per_update_bps
+        {
+            require!(
+                new_max_observation_change_per_update_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_CHANGE_BPS,
+                CLOBError::DisallowedConfigValue
+            );
+            order_book.twap_oracle.max_observation_change_per_update_bps =
+                new_max_observation_change_per_update_bps;
+        }
+        if let Some(new_max_observation_change_per_slot_bps) =
+            new_max_observation_change_per_slot_bps
+        {
+            require!(
+                new_max_observation_change_per_slot_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_SLOT_BPS,
+                CLOBError::DisallowedConfigValue
+            );
+            order_book.twap_oracle.max_observation_change_per_slot_bps =
+                new_max_observation_change_per_slot_bps;
+        }
 
         Ok(())
     }
