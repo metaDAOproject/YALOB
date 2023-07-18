@@ -2,9 +2,13 @@ use super::*;
 
 #[account]
 pub struct GlobalState {
+    /// Admins can do the following:
+    /// - collect taker fees
+    /// - TODO: change TWAP parameters (within bounds)
+    /// - TODO: change min_amount
+    pub admin: Pubkey,
     /// The CLOB needs fees to disincentivize wash trading / TWAP manipulation.
     /// Besides, profits are virtuous :)
-    pub fee_collector: Pubkey,
     pub taker_fee_in_bps: u16,
     /// Since market maker slots are finite, we need some cost to prevent someone
     /// from taking all the market maker slots. Also, have I mentioned that profits

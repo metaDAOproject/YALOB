@@ -53,9 +53,9 @@ pub struct InitializeOrderBook<'info> {
 
 #[derive(Accounts)]
 pub struct SweepFees<'info> {
-    #[account(has_one = fee_collector)]
+    #[account(has_one = admin)]
     pub global_state: Account<'info, GlobalState>,
-    pub fee_collector: Signer<'info>,
+    pub admin: Signer<'info>,
     #[account(mut, has_one = base_vault, has_one = quote_vault)]
     pub order_book: AccountLoader<'info, OrderBook>,
     #[account(mut)]
@@ -75,11 +75,11 @@ pub struct AddMarketMaker<'info> {
     pub order_book: AccountLoader<'info, OrderBook>,
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(has_one = fee_collector)]
+    #[account(has_one = admin)]
     pub global_state: Account<'info, GlobalState>,
     /// CHECK: no r/w, just lamport transfer
     #[account(mut)]
-    pub fee_collector: UncheckedAccount<'info>,
+    pub admin: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 

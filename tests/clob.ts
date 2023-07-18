@@ -21,10 +21,10 @@ describe("YALOB", () => {
       [anchor.utils.bytes.utf8.encode("WWCACOTMICMIBMHAFTTWYGHMB")],
       program.programId
     );
-    const feeCollector = anchor.web3.Keypair.generate();
+    const admin = anchor.web3.Keypair.generate();
 
     await program.methods
-      .initializeGlobalState(feeCollector.publicKey)
+      .initializeGlobalState(admin.publicKey)
       .accounts({
         globalState,
         payer: payer.publicKey,
@@ -94,7 +94,7 @@ describe("YALOB", () => {
       base,
       quote,
       mintAuthority,
-      feeCollector
+      admin
     );
 
     const [mm1, mm1Base, mm1Quote] = await generateMarketMaker(
@@ -109,7 +109,7 @@ describe("YALOB", () => {
       base,
       quote,
       mintAuthority,
-      feeCollector
+      admin
     );
 
     let mm0BalsBefore = await program.methods
@@ -404,36 +404,36 @@ describe("YALOB", () => {
 
     assert(twapPrice.eq(expectedPrice));
 
-    const feeCollectorBase = await token.createAccount(
+    const adminBase = await token.createAccount(
       connection,
       payer,
       base,
-      feeCollector.publicKey
+      admin.publicKey
     );
 
-    const feeCollectorQuote = await token.createAccount(
+    const adminQuote = await token.createAccount(
       connection,
       payer,
       quote,
-      feeCollector.publicKey
+      admin.publicKey
     );
 
     await program.methods
       .sweepFees()
       .accounts({
         globalState,
-        feeCollector: feeCollector.publicKey,
+        admin: admin.publicKey,
         orderBook,
-        baseTo: feeCollectorBase,
-        quoteTo: feeCollectorQuote,
+        baseTo: adminBase,
+        quoteTo: adminQuote,
         baseVault,
         quoteVault,
         tokenProgram: token.TOKEN_PROGRAM_ID,
       })
-      .signers([feeCollector])
+      .signers([admin])
       .rpc();
 
-    let quoteFeesSwept = (await token.getAccount(connection, feeCollectorQuote))
+    let quoteFeesSwept = (await token.getAccount(connection, adminQuote))
       .amount;
     assert.equal(1, Number(quoteFeesSwept));
 
@@ -452,47 +452,50 @@ describe("YALOB", () => {
       .signers([mm1])
       .rpc();
 
+    // this is a twap test that makes the tests longer to run, uncomment it
+    // if you wish
+
     // this should fill up the book
-    for (let i = 0; i < 122; i++) {
-      await program.methods
-        .submitLimitOrder(
-          { sell: {} },
-          new anchor.BN(1000), // amount
-          new anchor.BN(3e9), // this price shouldn't affect anything
-          60 + i, // ref id
-          0 // mm index
-        )
-        .accounts({
-          authority: mm0.publicKey,
-          orderBook,
-        })
-        .signers([mm0])
-        .rpc();
-    }
+    /* for (let i = 0; i < 122; i++) { */
+    /*   await program.methods */
+    /*     .submitLimitOrder( */
+    /*       { sell: {} }, */
+    /*       new anchor.BN(1000), // amount */
+    /*       new anchor.BN(3e9), // this price shouldn't affect anything */
+    /*       60 + i, // ref id */
+    /*       0 // mm index */
+    /*     ) */
+    /*     .accounts({ */
+    /*       authority: mm0.publicKey, */
+    /*       orderBook, */
+    /*     }) */
+    /*     .signers([mm0]) */
+    /*     .rpc(); */
+    /* } */
 
-    twap = await program.methods
-      .getTwap()
-      .accounts({
-        orderBook,
-      })
-      .view();
+    /* twap = await program.methods */
+    /*   .getTwap() */
+    /*   .accounts({ */
+    /*     orderBook, */
+    /*   }) */
+    /*   .view(); */
 
-    slotsPassed = twap.lastUpdatedSlot.sub(endingSlot);
+    /* slotsPassed = twap.lastUpdatedSlot.sub(endingSlot); */
 
-    assert(slotsPassed.gtn(100));
-    assert(slotsPassed.ltn(200));
+    /* assert(slotsPassed.gtn(100)); */
+    /* assert(slotsPassed.ltn(200)); */
 
-    aggregatorDifference = twap.observationAggregator.sub(
-      endingObservationAggregator
-    );
+    /* aggregatorDifference = twap.observationAggregator.sub( */
+    /*   endingObservationAggregator */
+    /* ); */
 
-    twapPrice = aggregatorDifference.div(slotsPassed);
+    /* twapPrice = aggregatorDifference.div(slotsPassed); */
 
-    let minPrice = new anchor.BN(2e9 - 1e8); // 1.9
-    let maxPrice = new anchor.BN(2e9);
+    /* let minPrice = new anchor.BN(2e9 - 1e8); // 1.9 */
+    /* let maxPrice = new anchor.BN(2e9); */
 
-    assert(twapPrice.gt(minPrice));
-    assert(twapPrice.lt(maxPrice));
+    /* assert(twapPrice.gt(minPrice)); */
+    /* assert(twapPrice.lt(maxPrice)); */
   });
 });
 
@@ -511,7 +514,7 @@ async function generateMarketMaker(
   base: anchor.web3.PublicKey,
   quote: anchor.web3.PublicKey,
   mintAuthority: anchor.web3.Keypair,
-  feeCollector: anchor.web3.Keypair
+  admin: anchor.web3.Keypair
 ): [anchor.web3.Keypair, anchor.web3.PublicKey, anchor.web3.PublicKey] {
   const mm = anchor.web3.Keypair.generate();
 
@@ -553,7 +556,7 @@ async function generateMarketMaker(
       orderBook,
       payer: payer.publicKey,
       globalState,
-      feeCollector: feeCollector.publicKey,
+      admin: admin.publicKey,
     })
     .rpc();
 

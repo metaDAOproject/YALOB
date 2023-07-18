@@ -2,8 +2,9 @@ use super::*;
 use std::default::Default;
 
 pub const BOOK_DEPTH: usize = 128;
-pub const NULL: u8 = 128;
 pub const NUM_MARKET_MAKERS: usize = 64;
+
+pub const NULL: u8 = 128;
 
 #[account(zero_copy)]
 pub struct OrderBook {

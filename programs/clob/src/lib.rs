@@ -24,11 +24,11 @@ pub mod clob {
 
     pub fn initialize_global_state(
         ctx: Context<InitializeGlobalState>,
-        fee_collector: Pubkey,
+        admin: Pubkey,
     ) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
 
-        global_state.fee_collector = fee_collector;
+        global_state.admin = admin;
         global_state.taker_fee_in_bps = 10;
         global_state.market_maker_burn_in_lamports = 1_000_000_000;
 
@@ -119,7 +119,7 @@ pub mod clob {
         );
 
         let from = ctx.accounts.payer.key();
-        let to = global_state.fee_collector;
+        let to = global_state.admin;
         let lamports_to_burn = global_state.market_maker_burn_in_lamports;
 
         solana_program::program::invoke(
@@ -127,7 +127,7 @@ pub mod clob {
             &[
                 ctx.accounts.system_program.to_account_info(),
                 ctx.accounts.payer.to_account_info(),
-                ctx.accounts.fee_collector.to_account_info(),
+                ctx.accounts.admin.to_account_info(),
             ],
         )?;
 
