@@ -88,6 +88,9 @@ pub mod clob {
         order_book.twap_oracle.max_observation_change_per_update_bps = 250;
         order_book.twap_oracle.max_observation_change_per_slot_bps = 100;
 
+        order_book.min_base_limit_amount = 1;
+        order_book.min_quote_limit_amount = 1;
+
         order_book.base_fees_sweepable = 0;
         order_book.quote_fees_sweepable = 0;
 
@@ -98,31 +101,38 @@ pub mod clob {
 
     pub fn update_order_book(
         ctx: Context<UpdateOrderBook>,
-        new_max_observation_change_per_update_bps: Option<u16>,
-        new_max_observation_change_per_slot_bps: Option<u16>,
+        new_max_observation_change_per_update_bps: u16,
+        new_max_observation_change_per_slot_bps: u16,
+        new_min_base_limit_amount: u64,
+        new_min_quote_limit_amount: u64,
     ) -> Result<()> {
         let mut order_book = ctx.accounts.order_book.load_init()?;
 
-        if let Some(new_max_observation_change_per_update_bps) =
-            new_max_observation_change_per_update_bps
-        {
-            require!(
-                new_max_observation_change_per_update_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_CHANGE_BPS,
-                CLOBError::DisallowedConfigValue
-            );
-            order_book.twap_oracle.max_observation_change_per_update_bps =
-                new_max_observation_change_per_update_bps;
-        }
-        if let Some(new_max_observation_change_per_slot_bps) =
-            new_max_observation_change_per_slot_bps
-        {
-            require!(
-                new_max_observation_change_per_slot_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_SLOT_BPS,
-                CLOBError::DisallowedConfigValue
-            );
-            order_book.twap_oracle.max_observation_change_per_slot_bps =
-                new_max_observation_change_per_slot_bps;
-        }
+        require!(
+            new_max_observation_change_per_update_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_CHANGE_BPS,
+            CLOBError::DisallowedConfigValue
+        );
+        order_book.twap_oracle.max_observation_change_per_update_bps =
+            new_max_observation_change_per_update_bps;
+
+        require!(
+            new_max_observation_change_per_slot_bps <= MAX_MAX_OBSERVATION_CHANGE_PER_SLOT_BPS,
+            CLOBError::DisallowedConfigValue
+        );
+        order_book.twap_oracle.max_observation_change_per_slot_bps =
+            new_max_observation_change_per_slot_bps;
+
+        require!(
+            new_min_base_limit_amount > 0,
+            CLOBError::DisallowedConfigValue
+        );
+        order_book.min_base_limit_amount = new_min_base_limit_amount;
+
+        require!(
+            new_min_quote_limit_amount > 0,
+            CLOBError::DisallowedConfigValue
+        );
+        order_book.min_quote_limit_amount = new_min_quote_limit_amount;
 
         Ok(())
     }
@@ -302,6 +312,12 @@ pub mod clob {
             market_maker.authority == ctx.accounts.authority.key(),
             CLOBError::UnauthorizedMarketMaker
         );
+
+        let min_amount = match side {
+            Side::Buy => order_book.min_quote_limit_amount,
+            Side::Sell => order_book.min_base_limit_amount,
+        };
+        require!(amount_in >= min_amount, CLOBError::MinLimitAmountNotMet);
 
         let (order_list, makers) = order_book.order_list(side);
 

@@ -16,4 +16,6 @@ pub enum CLOBError {
     MakerNotFound,
     #[msg("The admin is trying to set a configurable to a disallowed value")]
     DisallowedConfigValue,
+    #[msg("Your size is not size. Try a bigger limit order")]
+    MinLimitAmountNotMet,
 }

@@ -16,6 +16,10 @@ pub struct OrderBook {
     pub sells: OrderList,
     pub market_makers: [MarketMaker; NUM_MARKET_MAKERS],
     pub twap_oracle: TWAPOracle,
+    // The minimum amount of base/quote tokens that a limit order can offer,
+    // to prevent spam.
+    pub min_base_limit_amount: u64,
+    pub min_quote_limit_amount: u64,
     pub base_fees_sweepable: u64,
     pub quote_fees_sweepable: u64,
     pub pda_bump: u8,
