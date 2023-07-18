@@ -436,6 +436,63 @@ describe("YALOB", () => {
     let quoteFeesSwept = (await token.getAccount(connection, feeCollectorQuote))
       .amount;
     assert.equal(1, Number(quoteFeesSwept));
+
+    await program.methods
+      .submitLimitOrder(
+        { buy: {} },
+        new anchor.BN(101), // amount
+        new anchor.BN(2e9 - 100), // price
+        13, // ref id
+        1 // mm index
+      )
+      .accounts({
+        authority: mm1.publicKey,
+        orderBook,
+      })
+      .signers([mm1])
+      .rpc();
+
+    // this should fill up the book
+    for (let i = 0; i < 122; i++) {
+      await program.methods
+        .submitLimitOrder(
+          { sell: {} },
+          new anchor.BN(1000), // amount
+          new anchor.BN(3e9), // this price shouldn't affect anything
+          60 + i, // ref id
+          0 // mm index
+        )
+        .accounts({
+          authority: mm0.publicKey,
+          orderBook,
+        })
+        .signers([mm0])
+        .rpc();
+    }
+
+    twap = await program.methods
+      .getTwap()
+      .accounts({
+        orderBook,
+      })
+      .view();
+
+    slotsPassed = twap.lastUpdatedSlot.sub(endingSlot);
+
+    assert(slotsPassed.gtn(100));
+    assert(slotsPassed.ltn(200));
+
+    aggregatorDifference = twap.observationAggregator.sub(
+      endingObservationAggregator
+    );
+
+    twapPrice = aggregatorDifference.div(slotsPassed);
+
+    let minPrice = new anchor.BN(2e9 - 1e8); // 1.9
+    let maxPrice = new anchor.BN(2e9);
+
+    assert(twapPrice.gt(minPrice));
+    assert(twapPrice.lt(maxPrice));
   });
 });
 

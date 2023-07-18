@@ -2,7 +2,7 @@ use super::*;
 use std::default::Default;
 
 pub const BOOK_DEPTH: usize = 128;
-pub const NULL: u8 = BOOK_DEPTH as u8;
+pub const NULL: u8 = 128;
 pub const NUM_MARKET_MAKERS: usize = 64;
 
 #[account(zero_copy)]
@@ -22,23 +22,26 @@ pub struct OrderBook {
 }
 
 impl OrderBook {
-    pub fn get_opposite_side(
+    pub fn opposing_order_list(
         &mut self,
         side: Side,
     ) -> (&mut OrderList, &mut [MarketMaker; NUM_MARKET_MAKERS]) {
-        let maker_makers = &mut self.market_makers;
         let list = match side {
             Side::Buy => &mut self.sells,
             Side::Sell => &mut self.buys,
         };
-        (list, maker_makers)
+        (list, &mut self.market_makers)
     }
 
-    pub fn order_list(&mut self, side: Side) -> &mut OrderList {
-        match side {
+    pub fn order_list(
+        &mut self,
+        side: Side,
+    ) -> (&mut OrderList, &mut [MarketMaker; NUM_MARKET_MAKERS]) {
+        let list = match side {
             Side::Buy => &mut self.buys,
             Side::Sell => &mut self.sells,
-        }
+        };
+        (list, &mut self.market_makers)
     }
 
     pub fn update_twap_oracle(&mut self) -> Result<()> {
@@ -183,13 +186,14 @@ impl OrderList {
     /// Try inserting an `Order` into the `OrderList`, returning the index of
     /// the slot where the order was placed if it was placed.
     ///
-    /// It is the client's responsibility to debit the maker's tokens.
+    /// If the order can be placed, debits the relevant tokens from the maker.
     pub fn insert_order(
         &mut self,
         amount: u64,
         price: u64,
         ref_id: u32,
         market_maker_index: u8,
+        makers: &mut [MarketMaker; NUM_MARKET_MAKERS],
     ) -> Option<u8> {
         let mut order = Order {
             amount_in: amount,
@@ -210,7 +214,7 @@ impl OrderList {
                     // If no space remains, remove the worst-priced order from
                     // the order book, and store the current order in its chunk.
                     let i = self.worst_order_idx;
-                    self.delete_order(i);
+                    self.delete_order(i, makers);
 
                     i as usize
                 });
@@ -229,7 +233,7 @@ impl OrderList {
                     NULL
                 };
 
-                self.place_order(order, order_idx as u8);
+                self.place_order(order, order_idx as u8, makers);
 
                 return Some(order_idx as u8);
             }
@@ -246,13 +250,32 @@ impl OrderList {
             };
             order.next_idx = NULL;
 
-            self.place_order(order, free_chunk as u8);
+            self.place_order(order, free_chunk as u8, makers);
 
             free_chunk as u8
         })
     }
 
-    fn place_order(&mut self, order: Order, i: u8) {
+    //let market_maker = &mut order_book.market_makers[market_maker_index as usize];
+    //match side {
+    //    Side::Buy => {
+    //        market_maker.quote_balance = market_maker
+    //            .quote_balance
+    //            .checked_sub(amount_in)
+    //            .ok_or(CLOBError::InsufficientBalance)?;
+    //    }
+    //    Side::Sell => {
+    //        market_maker.base_balance = market_maker
+    //            .base_balance
+    //            .checked_sub(amount_in)
+    //            .ok_or(CLOBError::InsufficientBalance)?;
+    //    }
+    //}
+
+    fn place_order(&mut self, order: Order, i: u8, makers: &mut [MarketMaker; NUM_MARKET_MAKERS]) {
+        // this order shouldn't clobber any existing order
+        assert!(self.orders[i as usize].amount_in == 0);
+
         if order.prev_idx == NULL {
             self.best_order_idx = i;
         } else {
@@ -265,15 +288,35 @@ impl OrderList {
             self.orders[order.next_idx as usize].prev_idx = i;
         }
 
+        self.debit_tokens(
+            order.amount_in,
+            &mut makers[order.market_maker_index as usize],
+        );
+
         self.orders[i as usize] = order;
         self.free_bitmap.mark_reserved(i);
+    }
+
+    fn debit_tokens(&mut self, amount: u64, maker: &mut MarketMaker) {
+        match self.side.into() {
+            // overflow protection is compiled in with overflow-checks = true in the root Cargo.toml
+            Side::Buy => maker.quote_balance -= amount,
+            Side::Sell => maker.base_balance -= amount,
+        };
+    }
+
+    fn credit_tokens(&mut self, amount: u64, maker: &mut MarketMaker) {
+        match self.side.into() {
+            Side::Buy => maker.quote_balance += amount,
+            Side::Sell => maker.base_balance += amount,
+        };
     }
 
     /// Deletes an order from the order book and returns the contents of that order.
     ///
     /// It is the client's responsibility to credit any tokens to the relevant
     /// maker.
-    pub fn delete_order(&mut self, i: u8) -> Order {
+    pub fn delete_order(&mut self, i: u8, makers: &mut [MarketMaker; NUM_MARKET_MAKERS]) -> Order {
         let order = self.orders[i as usize];
 
         if i == self.best_order_idx {
@@ -287,6 +330,11 @@ impl OrderList {
         } else {
             self.orders[order.next_idx as usize].prev_idx = order.prev_idx;
         }
+
+        self.credit_tokens(
+            order.amount_in,
+            &mut makers[order.market_maker_index as usize],
+        );
 
         self.orders[i as usize] = Order::default();
         self.free_bitmap.mark_free(i);
@@ -304,7 +352,6 @@ impl OrderList {
 }
 
 #[zero_copy]
-#[derive(Default)]
 pub struct Order {
     pub next_idx: u8,
     pub prev_idx: u8,
@@ -314,6 +361,20 @@ pub struct Order {
     // if this order is filled, maker will receive (amount * price) / 1e9
     pub price: u64,
     pub amount_in: u64,
+}
+
+impl Default for Order {
+    fn default() -> Self {
+        Self {
+            next_idx: NULL,
+            prev_idx: NULL,
+            market_maker_index: NULL,
+            _padding: [0],
+            ref_id: 0,
+            price: 0,
+            amount_in: 0,
+        }
+    }
 }
 
 #[zero_copy]

@@ -3,7 +3,7 @@
 **Y**et **a**nother **l**imit **o**rder **b**ook. This one is optimized for *simplicity and performance*. That means:
 - ~1,000 lines of code instead of the typical ~10,000
 - basic data structures like linked lists and bitmaps instead of more complex ones like red-black trees or patricia tries
-- ~3,300 to ~5,800 CUs to submit limit orders, with a typical access pattern (competing on price at the top of the book) leading to sub-4,000 CU consumption (which is better than all of the order books I've seen)
+- ~3,100 to ~5,700 CUs to submit limit orders, with a typical access pattern leading to sub-4,000 CU consumption (better than all of the order books I've seen)
 - ~2,600 CUs to cancel limit orders
 - no keeper transactions ('cranking') required
 

@@ -55,7 +55,8 @@ pub mod clob {
         order_book.sells.worst_order_idx = NULL;
 
         // TODO: make this configurable via global state
-        order_book.twap_oracle.max_observation_change_per_update_bps = 100;
+        order_book.twap_oracle.max_observation_change_per_update_bps = 250;
+        order_book.twap_oracle.max_observation_change_per_slot_bps = 100;
 
         order_book.base_fees_sweepable = 0;
         order_book.quote_fees_sweepable = 0;
@@ -241,31 +242,12 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let order_list = order_book.order_list(side);
+        let (order_list, makers) = order_book.order_list(side);
 
-        let order_idx = order_list.insert_order(amount_in, price, ref_id, market_maker_index);
+        let order_idx =
+            order_list.insert_order(amount_in, price, ref_id, market_maker_index, makers);
 
-        if let Some(order_idx) = order_idx {
-            let market_maker = &mut order_book.market_makers[market_maker_index as usize];
-            match side {
-                Side::Buy => {
-                    market_maker.quote_balance = market_maker
-                        .quote_balance
-                        .checked_sub(amount_in)
-                        .ok_or(CLOBError::InsufficientBalance)?;
-                }
-                Side::Sell => {
-                    market_maker.base_balance = market_maker
-                        .base_balance
-                        .checked_sub(amount_in)
-                        .ok_or(CLOBError::InsufficientBalance)?;
-                }
-            }
-
-            return Ok(order_idx);
-        } else {
-            return Err(error!(CLOBError::InferiorPrice));
-        }
+        order_idx.ok_or_else(|| error!(CLOBError::InferiorPrice))
     }
 
     pub fn cancel_limit_order(
@@ -285,7 +267,7 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let order_list = order_book.order_list(side);
+        let (order_list, makers) = order_book.order_list(side);
 
         let order = order_list.orders[order_index as usize];
 
@@ -294,18 +276,7 @@ pub mod clob {
             CLOBError::UnauthorizedMarketMaker
         );
 
-        let deleted_order = order_list.delete_order(order_index);
-
-        match side {
-            Side::Buy => {
-                order_book.market_makers[market_maker_index as usize].quote_balance +=
-                    deleted_order.amount_in
-            }
-            Side::Sell => {
-                order_book.market_makers[market_maker_index as usize].base_balance +=
-                    deleted_order.amount_in
-            }
-        };
+        order_list.delete_order(order_index, makers);
 
         Ok(())
     }
@@ -367,7 +338,7 @@ pub mod clob {
 
         // If the user is buying, the maker is selling. If the maker is
         // selling, the user is buying.
-        let (order_list, market_makers) = order_book.get_opposite_side(side);
+        let (order_list, makers) = order_book.opposing_order_list(side);
 
         for (book_order, book_order_idx) in order_list.iter() {
             let order_amount_available = book_order.amount_in as u128; // u128s prevent overflow
@@ -401,11 +372,11 @@ pub mod clob {
 
                 match side {
                     Side::Buy => {
-                        market_makers[book_order.market_maker_index as usize].quote_balance +=
+                        makers[book_order.market_maker_index as usize].quote_balance +=
                             amount_in_after_fees as u64
                     }
                     Side::Sell => {
-                        market_makers[book_order.market_maker_index as usize].base_balance +=
+                        makers[book_order.market_maker_index as usize].base_balance +=
                             amount_in_after_fees as u64
                     }
                 };
@@ -417,11 +388,11 @@ pub mod clob {
 
                 match side {
                     Side::Buy => {
-                        market_makers[book_order.market_maker_index as usize].quote_balance +=
+                        makers[book_order.market_maker_index as usize].quote_balance +=
                             amount_order_can_absorb as u64
                     }
                     Side::Sell => {
-                        market_makers[book_order.market_maker_index as usize].base_balance +=
+                        makers[book_order.market_maker_index as usize].base_balance +=
                             amount_order_can_absorb as u64
                     }
                 };
@@ -431,7 +402,7 @@ pub mod clob {
         }
 
         for order_idx in filled_orders {
-            order_list.delete_order(order_idx);
+            order_list.delete_order(order_idx, makers);
         }
 
         require!(amount_out >= min_out, CLOBError::TakeNotFilled);
@@ -473,9 +444,9 @@ pub mod clob {
         maker_pubkey: Pubkey,
     ) -> Result<MarketMakerBalances> {
         let order_book = ctx.accounts.order_book.load()?;
-        let market_makers = &order_book.market_makers;
+        let makers = &order_book.market_makers;
 
-        for market_maker in market_makers {
+        for market_maker in makers {
             if market_maker.authority == maker_pubkey {
                 return Ok(MarketMakerBalances {
                     base_balance: market_maker.base_balance,
